@@ -1,0 +1,87 @@
+# Calendario - Applicazione di Gestione Appuntamenti
+
+![Modalita estesa](screenshot/modEstesa_v102.webp)
+
+## Descrizione
+Calendario è un'applicazione desktop Java che permette di visualizzare e gestire appuntamenti in modo semplice ed efficace. Progettata con un'interfaccia utente intuitiva, offre sia una vista mensile completa che una modalità compatta per una rapida consultazione.
+
+![Modalita compatta](screenshot/modCompatta_v102.webp)
+
+## Funzionalità Principali
+
+### Visualizzazione Calendario
+- **Vista Mensile Completa**: Visualizzazione dettagliata di tutti i giorni del mese con appuntamenti
+- **Griglia Mensile 7x6**: Visualizzazione completa con giorni del mese precedente e successivo
+- **Modalità Compatta**: Visualizzazione ridotta con evidenza dei giorni che contengono appuntamenti
+- **Evidenziazione Giorni Speciali**: Giorno corrente, weekend e giorni con eventi evidenziati con colori diversi
+- **Tooltip Eventi**: Anteprima degli appuntamenti al passaggio del mouse
+
+### Gestione Appuntamenti
+- **Inserimento e Modifica Integrati**: Creazione, modifica ed eliminazione appuntamenti direttamente dalla form integrata nel pannello dettagli
+- **Salvataggio Permanente**: Gli appuntamenti vengono salvati su disco e mantenuti tra un avvio e l'altro
+- **Filtri per Categoria**: Possibilità di filtrare gli appuntamenti per tipo, incluso il tipo predefinito "Altro"
+- **Orari Guidati**: Selezione dell'ora con intervalli di 15 minuti, da 00:00 a 23:45
+- **Drag & Drop**: Spostamento degli eventi tra giorni diversi e duplicazione con `Ctrl` + trascinamento
+- **Importazione/Esportazione ICS**: Importazione ed esportazione degli appuntamenti in formato `.ics`
+- **Finestra di Dialogo**: In modalità compatta, visualizzazione degli appuntamenti del giorno selezionato in una finestra separata
+
+### Interfaccia Utente
+- **Design Moderno**: Interfaccia pulita con bordi arrotondati e colori coordinati
+- **Sidebar Riorganizzata**: Navigazione mese, controlli rapidi, filtri e sezione Help raccolti nella barra laterale
+- **Navigazione Intuitiva**: Pulsanti per passare al mese precedente/successivo e tornare alla data odierna
+- **Supporto Multilingua**: Cambio lingua italiano/inglese tramite pulsante con bandiere
+- **Tema Chiaro/Scuro**: Toggle rapido per cambiare tema dell'applicazione
+- **Sempre in Primo Piano**: Possibilità di mantenere la finestra sopra le altre applicazioni
+
+## Requisiti di Sistema
+- Java Runtime Environment 8 o superiore
+- Sistema operativo: Windows, macOS o Linux
+
+## Installazione
+
+1. Assicurarsi di avere Java installato sul proprio sistema
+2. Clonare o scaricare il repository da GitHub
+3. Se si è su Windows, è possibile compilare ed eseguire il progetto senza un IDE utilizzando il file `compila_e_avvia.bat`. Questo script:
+   - Compila automaticamente tutti i file `.java`
+   - Copia le risorse necessarie
+   - Avvia l'applicazione
+
+   Basta eseguire il file con doppio clic o usarlo da terminale.
+
+4. In alternativa, è possibile compilare manualmente con il comando `javac` o utilizzare un IDE come Eclipse o IntelliJ IDEA
+
+## Idee per Futuri Aggiornamenti
+
+### Funzionalità Avanzate
+- **Sincronizzazione Cloud**: Integrazione con servizi come Google Calendar o Microsoft Outlook
+- **Notifiche**: Sistema di promemoria per appuntamenti imminenti
+- **Appuntamenti Ricorrenti**: Possibilità di creare eventi che si ripetono a intervalli regolari
+- **Condivisione Calendario**: Opzione per condividere il calendario con altri utenti
+
+### Miglioramenti dell'Interfaccia
+- **Temi Personalizzabili**: Possibilità di cambiare colori e stili dell'interfaccia
+- **Vista Settimanale/Giornaliera**: Aggiunta di visualizzazioni alternative oltre a quella mensile
+- **Interfaccia Responsive**: Adattamento automatico a diverse dimensioni dello schermo
+
+### Funzionalità Aggiuntive
+- **Esportazione/Importazione CSV**: Supporto aggiuntivo al formato CSV
+- **Gestione Contatti**: Integrazione di una rubrica per associare persone agli appuntamenti
+- **Mappe e Luoghi**: Integrazione con servizi di mappe per visualizzare la posizione degli appuntamenti
+- **Statistiche**: Visualizzazione di grafici e statistiche sugli appuntamenti
+
+### Miglioramenti Tecnici
+- **Database Persistente**: Salvataggio degli appuntamenti in un database locale o remoto
+- **Prestazioni Ottimizzate**: Miglioramento dei tempi di caricamento e della reattività
+- **Supporto Mobile**: Versione per dispositivi Android e iOS
+- **API REST**: Creazione di un'API per interagire con il calendario da altre applicazioni
+
+## Contribuire
+Le contribuzioni sono benvenute! Se desideri migliorare Calendario, sentiti libero di:
+1. Fare fork del repository
+2. Creare un branch per la tua feature (`git checkout -b feature/NuovaFunzionalita`)
+3. Committare i tuoi cambiamenti (`git commit -m 'Aggiunta nuova funzionalità'`)
+4. Pushare al branch (`git push origin feature/NuovaFunzionalita`)
+5. Aprire una Pull Request
+
+## Licenza
+Questo progetto è distribuito con licenza MIT. Vedi il file `LICENSE` per maggiori dettagli.

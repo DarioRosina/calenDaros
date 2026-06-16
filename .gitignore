@@ -1,0 +1,16 @@
+# Compilati Java
+*.class
+
+# Directory di output
+bin/
+out/
+src/dashboard/sources.txt
+
+# Log
+*.log
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+**/bak/
