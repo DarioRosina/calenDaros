@@ -4,6 +4,7 @@ setlocal EnableDelayedExpansion
 set "SCRIPT_DIR=%~dp0"
 set "SRC_DIR=%SCRIPT_DIR%src\dashboard"
 set "BIN_DIR=%SCRIPT_DIR%bin"
+set "JAR_FILE=%SCRIPT_DIR%CalenDaros.jar"
 set "SOURCES_FILE=%BIN_DIR%\sources.txt"
 
 cd /d "%SRC_DIR%"
@@ -22,9 +23,17 @@ if errorlevel 1 (
     exit /b 1
 )
 
+where jar >nul 2>nul
+if errorlevel 1 (
+    echo [ERRORE] jar non trovato. Installa un JDK e aggiungi la cartella bin al PATH.
+    pause
+    exit /b 1
+)
+
 echo [INFO] Pulizia cartella bin...
 if exist "%BIN_DIR%" rmdir /s /q "%BIN_DIR%"
 mkdir "%BIN_DIR%"
+if exist "%JAR_FILE%" del /q "%JAR_FILE%"
 
 echo [INFO] Generazione lista file sorgenti...
 (
@@ -48,8 +57,15 @@ if exist "%SRC_DIR%\img" xcopy /E /I /Y "%SRC_DIR%\img" "%BIN_DIR%\dashboard\img
 if exist "%SRC_DIR%\i18n" xcopy /E /I /Y "%SRC_DIR%\i18n" "%BIN_DIR%\dashboard\i18n" >nul
 if exist "%SOURCES_FILE%" del /q "%SOURCES_FILE%"
 
+echo [INFO] Creazione JAR eseguibile...
+jar cfe "%JAR_FILE%" dashboard.Calendario -C "%BIN_DIR%" .
+if errorlevel 1 (
+    echo [ERRORE] Creazione JAR non riuscita.
+    pause
+    exit /b 1
+)
+
 echo [INFO] Avvio dell'applicazione...
-cd /d "%BIN_DIR%"
-java "-Dfile.encoding=UTF-8" dashboard.Calendario
+java "-Dfile.encoding=UTF-8" -jar "%JAR_FILE%" --always-on-top
 
 pause

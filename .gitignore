@@ -1,5 +1,6 @@
 # Compilati Java
 *.class
+*.jar
 
 # Directory di output
 bin/

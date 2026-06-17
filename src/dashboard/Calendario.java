@@ -96,7 +96,7 @@ public class Calendario extends JFrame {
         System.getProperty("user.home"), ".calenDaros", "appointments.properties");
     
     // Flag per tracciare la modalità di visualizzazione corrente
-    private boolean compactMode = false;
+    private boolean compactMode = true;
     private boolean alwaysOnTopMode = false;
     private boolean darkMode = false;
 
@@ -253,6 +253,11 @@ public class Calendario extends JFrame {
      * Inizializza l'interfaccia grafica e configura tutti i componenti necessari.
      */
     public Calendario() {
+        this(false);
+    }
+
+    public Calendario(boolean alwaysOnTopMode) {
+        this.alwaysOnTopMode = alwaysOnTopMode;
         configureTooltips();
         initializeFrame();
         initializeCalendar();
@@ -267,6 +272,7 @@ public class Calendario extends JFrame {
         setupAccelerator();
         setLayout(new BoxLayout(getContentPane(), BoxLayout.X_AXIS));
         setMinimumSize(new Dimension(224, 224));
+        setAlwaysOnTop(alwaysOnTopMode);
         setLocationRelativeTo(null);
         
         // Set application icon
@@ -401,6 +407,7 @@ public class Calendario extends JFrame {
         
         // Create and setup main appointment panel
         createAppointmentPanel();
+        mainPanel.setVisible(!compactMode);
         
         // Add panels to frame
         add(leftPanel, BorderLayout.WEST);
@@ -471,7 +478,7 @@ public class Calendario extends JFrame {
         pack();
 
         // Reset to desired size after packing
-        setSize(1020, 885);
+        setSize(compactMode ? getCompactWindowWidth() : 1020, compactMode ? 400 : 885);
         setLocationRelativeTo(null);
     }
     
@@ -2651,7 +2658,7 @@ public class Calendario extends JFrame {
      * Metodo principale che avvia l'applicazione Calendario.
      * Imposta il look and feel Nimbus e crea l'istanza del calendario.
      * 
-     * @param args argomenti da linea di comando (non utilizzati)
+     * @param args argomenti da linea di comando
      */
     public static void main(String[] args) {
         try {
@@ -2667,9 +2674,21 @@ public class Calendario extends JFrame {
         }
         configureTooltips();
         
+        boolean startAlwaysOnTop = shouldStartAlwaysOnTop(args);
         SwingUtilities.invokeLater(() -> {
-            Calendario calendar = new Calendario();
+            Calendario calendar = new Calendario(startAlwaysOnTop);
             calendar.setVisible(true);
         });
+    }
+
+    private static boolean shouldStartAlwaysOnTop(String[] args) {
+        for (String arg : args) {
+            if ("--always-on-top".equalsIgnoreCase(arg)
+                    || "--sempre-in-primo-piano".equalsIgnoreCase(arg)
+                    || "-top".equalsIgnoreCase(arg)) {
+                return true;
+            }
+        }
+        return false;
     }
 }
