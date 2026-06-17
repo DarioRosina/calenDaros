@@ -5,6 +5,9 @@
 ## Descrizione
 Calendario è un'applicazione desktop Java che permette di visualizzare e gestire appuntamenti in modo semplice ed efficace. Progettata con un'interfaccia utente intuitiva, offre sia una vista mensile completa che una modalità compatta per una rapida consultazione.
 
+## Dietro il Progetto
+Per approfondire l'idea alla base di calenDaros e le considerazioni fatte nel passaggio da una versione all'altra, leggi il post dedicato sul mio blog: **[calenDaros - idea, evoluzione e scelte di progetto](https://darioros.it/posts/calenDaros)**.
+
 ![Modalita compatta](screenshot/modCompatta_v102.webp)
 
 ## Funzionalità Principali
