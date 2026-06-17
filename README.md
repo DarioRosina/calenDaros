@@ -23,7 +23,6 @@ Calendario è un'applicazione desktop Java che permette di visualizzare e gestir
 - **Orari Guidati**: Selezione dell'ora con intervalli di 15 minuti, da 00:00 a 23:45
 - **Drag & Drop**: Spostamento degli eventi tra giorni diversi e duplicazione con `Ctrl` + trascinamento
 - **Importazione/Esportazione ICS**: Importazione ed esportazione degli appuntamenti in formato `.ics`
-- **Finestra di Dialogo**: In modalità compatta, visualizzazione degli appuntamenti del giorno selezionato in una finestra separata
 
 ### Interfaccia Utente
 - **Design Moderno**: Interfaccia pulita con bordi arrotondati e colori coordinati
@@ -71,7 +70,6 @@ Calendario è un'applicazione desktop Java che permette di visualizzare e gestir
 
 ### Miglioramenti Tecnici
 - **Database Persistente**: Salvataggio degli appuntamenti in un database locale o remoto
-- **Prestazioni Ottimizzate**: Miglioramento dei tempi di caricamento e della reattività
 - **Supporto Mobile**: Versione per dispositivi Android e iOS
 - **API REST**: Creazione di un'API per interagire con il calendario da altre applicazioni
 

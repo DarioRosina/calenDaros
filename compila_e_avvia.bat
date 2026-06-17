@@ -1,9 +1,9 @@
 @echo off
-setlocal
+setlocal EnableDelayedExpansion
 
 set "SCRIPT_DIR=%~dp0"
-set "SRC_DIR=%SCRIPT_DIR%."
-set "BIN_DIR=%SCRIPT_DIR%..\bin"
+set "SRC_DIR=%SCRIPT_DIR%src\dashboard"
+set "BIN_DIR=%SCRIPT_DIR%bin"
 set "SOURCES_FILE=%BIN_DIR%\sources.txt"
 
 cd /d "%SRC_DIR%"
@@ -28,7 +28,11 @@ mkdir "%BIN_DIR%"
 
 echo [INFO] Generazione lista file sorgenti...
 (
-    for /R "%SRC_DIR%" %%F in (*.java) do echo "%%F"
+    for /R "%SRC_DIR%" %%F in (*.java) do (
+        set "SOURCE=%%F"
+        set "SOURCE=!SOURCE:\=/!"
+        echo "!SOURCE!"
+    )
 ) > "%SOURCES_FILE%"
 
 echo [INFO] Compilazione in corso...
@@ -40,8 +44,8 @@ if errorlevel 1 (
 )
 
 echo [INFO] Copia delle risorse statiche...
-if exist "img" xcopy /E /I /Y "img" "%BIN_DIR%\dashboard\img" >nul
-if exist "i18n" xcopy /E /I /Y "i18n" "%BIN_DIR%\dashboard\i18n" >nul
+if exist "%SRC_DIR%\img" xcopy /E /I /Y "%SRC_DIR%\img" "%BIN_DIR%\dashboard\img" >nul
+if exist "%SRC_DIR%\i18n" xcopy /E /I /Y "%SRC_DIR%\i18n" "%BIN_DIR%\dashboard\i18n" >nul
 if exist "%SOURCES_FILE%" del /q "%SOURCES_FILE%"
 
 echo [INFO] Avvio dell'applicazione...
