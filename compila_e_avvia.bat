@@ -66,6 +66,6 @@ if errorlevel 1 (
 )
 
 echo [INFO] Avvio dell'applicazione...
-java "-Dfile.encoding=UTF-8" -jar "%JAR_FILE%" --always-on-top
+java "-Dfile.encoding=UTF-8" -jar "%JAR_FILE%" --always-on-top --top-left --dark %*
 
 pause

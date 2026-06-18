@@ -18,6 +18,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.text.MessageFormat;
+import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -247,6 +248,15 @@ public class Calendario extends JFrame {
 
     // Abilita log per stampare a console la dimensione dei pannelli
     private boolean debug = false;
+    private final StartupPosition startupPosition;
+
+    private enum StartupPosition {
+        TOP_LEFT,
+        TOP_RIGHT,
+        BOTTOM_LEFT,
+        BOTTOM_RIGHT,
+        CENTER
+    }
     
     /**
      * Costruttore della classe Calendario.
@@ -257,7 +267,18 @@ public class Calendario extends JFrame {
     }
 
     public Calendario(boolean alwaysOnTopMode) {
+        this(alwaysOnTopMode, StartupPosition.CENTER, false, true);
+    }
+
+    public Calendario(boolean alwaysOnTopMode, StartupPosition startupPosition) {
+        this(alwaysOnTopMode, startupPosition, false, true);
+    }
+
+    public Calendario(boolean alwaysOnTopMode, StartupPosition startupPosition, boolean darkMode, boolean compactMode) {
         this.alwaysOnTopMode = alwaysOnTopMode;
+        this.startupPosition = startupPosition;
+        this.darkMode = darkMode;
+        this.compactMode = compactMode;
         configureTooltips();
         initializeFrame();
         initializeCalendar();
@@ -479,7 +500,46 @@ public class Calendario extends JFrame {
 
         // Reset to desired size after packing
         setSize(compactMode ? getCompactWindowWidth() : 1020, compactMode ? 400 : 885);
-        setLocationRelativeTo(null);
+        applyStartupPosition();
+    }
+
+    private void applyStartupPosition() {
+        if (startupPosition == StartupPosition.CENTER) {
+            setLocationRelativeTo(null);
+            return;
+        }
+
+        GraphicsConfiguration graphicsConfiguration = getGraphicsConfiguration();
+        Rectangle screenBounds = graphicsConfiguration.getBounds();
+        Insets screenInsets = Toolkit.getDefaultToolkit().getScreenInsets(graphicsConfiguration);
+        Rectangle usableBounds = new Rectangle(
+            screenBounds.x + screenInsets.left,
+            screenBounds.y + screenInsets.top,
+            screenBounds.width - screenInsets.left - screenInsets.right,
+            screenBounds.height - screenInsets.top - screenInsets.bottom
+        );
+
+        Dimension windowSize = getSize();
+        int x = usableBounds.x;
+        int y = usableBounds.y;
+
+        switch (startupPosition) {
+            case TOP_RIGHT:
+                x = usableBounds.x + usableBounds.width - windowSize.width;
+                break;
+            case BOTTOM_LEFT:
+                y = usableBounds.y + usableBounds.height - windowSize.height;
+                break;
+            case BOTTOM_RIGHT:
+                x = usableBounds.x + usableBounds.width - windowSize.width;
+                y = usableBounds.y + usableBounds.height - windowSize.height;
+                break;
+            case TOP_LEFT:
+            default:
+                break;
+        }
+
+        setLocation(Math.max(usableBounds.x, x), Math.max(usableBounds.y, y));
     }
     
     private void setupAccelerator() {
@@ -2625,16 +2685,9 @@ public class Calendario extends JFrame {
         toolTipManager.setReshowDelay(50);
         toolTipManager.setDismissDelay(10000);
 
-        boolean darkTooltips = false;
-        for (Window window : Window.getWindows()) {
-            if (window instanceof Calendario && ((Calendario) window).darkMode) {
-                darkTooltips = true;
-                break;
-            }
-        }
-        Color tooltipBackground = darkTooltips ? new Color(43, 47, 58) : new Color(255, 255, 248);
-        Color tooltipForeground = darkTooltips ? new Color(245, 247, 250) : new Color(31, 41, 55);
-        Color tooltipBorder = darkTooltips ? new Color(83, 91, 108) : NAVIGATION_BUTTON_COLOR_BD;
+        Color tooltipBackground = new Color(255, 255, 248);
+        Color tooltipForeground = new Color(31, 41, 55);
+        Color tooltipBorder = NAVIGATION_BUTTON_COLOR_BD;
 
         UIManager.put("ToolTip.background", tooltipBackground);
         UIManager.put("ToolTip.foreground", tooltipForeground);
@@ -2675,8 +2728,11 @@ public class Calendario extends JFrame {
         configureTooltips();
         
         boolean startAlwaysOnTop = shouldStartAlwaysOnTop(args);
+        StartupPosition startupPosition = getStartupPosition(args);
+        boolean startDarkMode = shouldStartDarkMode(args);
+        boolean startCompactMode = shouldStartCompactMode(args);
         SwingUtilities.invokeLater(() -> {
-            Calendario calendar = new Calendario(startAlwaysOnTop);
+            Calendario calendar = new Calendario(startAlwaysOnTop, startupPosition, startDarkMode, startCompactMode);
             calendar.setVisible(true);
         });
     }
@@ -2690,5 +2746,166 @@ public class Calendario extends JFrame {
             }
         }
         return false;
+    }
+
+    private static boolean shouldStartDarkMode(String[] args) {
+        for (int i = 0; i < args.length; i++) {
+            String arg = args[i];
+
+            if ("--dark".equalsIgnoreCase(arg) || "--tema-scuro".equalsIgnoreCase(arg)) {
+                return true;
+            }
+            if ("--light".equalsIgnoreCase(arg) || "--tema-chiaro".equalsIgnoreCase(arg)) {
+                return false;
+            }
+
+            String value = getOptionValue(args, i, "--tema", "--theme");
+            Boolean darkMode = parseDarkMode(value);
+            if (darkMode != null) {
+                if (!arg.contains("=")) {
+                    i++;
+                }
+                return darkMode;
+            }
+        }
+        return false;
+    }
+
+    private static boolean shouldStartCompactMode(String[] args) {
+        for (int i = 0; i < args.length; i++) {
+            String arg = args[i];
+
+            if ("--compact".equalsIgnoreCase(arg) || "--compatta".equalsIgnoreCase(arg)) {
+                return true;
+            }
+            if ("--extended".equalsIgnoreCase(arg) || "--estesa".equalsIgnoreCase(arg)) {
+                return false;
+            }
+
+            String value = getOptionValue(args, i, "--modalita", "--mode");
+            Boolean compactMode = parseCompactMode(value);
+            if (compactMode != null) {
+                if (!arg.contains("=")) {
+                    i++;
+                }
+                return compactMode;
+            }
+        }
+        return true;
+    }
+
+    private static StartupPosition getStartupPosition(String[] args) {
+        for (int i = 0; i < args.length; i++) {
+            String arg = args[i];
+            StartupPosition shortcutPosition = parseStartupPositionShortcut(arg);
+            if (shortcutPosition != null) {
+                return shortcutPosition;
+            }
+
+            String value = getOptionValue(args, i, "--posizione", "--position");
+            StartupPosition position = parseStartupPosition(value);
+            if (position != null) {
+                if (!arg.contains("=")) {
+                    i++;
+                }
+                return position;
+            }
+        }
+        return StartupPosition.CENTER;
+    }
+
+    private static StartupPosition parseStartupPositionShortcut(String arg) {
+        if (!arg.startsWith("--")) {
+            return null;
+        }
+        return parseStartupPosition(arg.substring(2));
+    }
+
+    private static String getOptionValue(String[] args, int index, String... optionNames) {
+        String arg = args[index];
+        for (String optionName : optionNames) {
+            if (arg.regionMatches(true, 0, optionName + "=", 0, optionName.length() + 1)) {
+                return arg.substring(optionName.length() + 1);
+            }
+            if (optionName.equalsIgnoreCase(arg) && index + 1 < args.length) {
+                return args[index + 1];
+            }
+        }
+        return null;
+    }
+
+    private static Boolean parseDarkMode(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        switch (normalizeArgumentValue(value)) {
+            case "scuro":
+            case "dark":
+                return true;
+            case "chiaro":
+            case "light":
+                return false;
+            default:
+                return null;
+        }
+    }
+
+    private static Boolean parseCompactMode(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        switch (normalizeArgumentValue(value)) {
+            case "compatta":
+            case "compatto":
+            case "compact":
+                return true;
+            case "estesa":
+            case "esteso":
+            case "extended":
+                return false;
+            default:
+                return null;
+        }
+    }
+
+    private static StartupPosition parseStartupPosition(String value) {
+        if (value == null) {
+            return null;
+        }
+
+        String normalized = normalizeArgumentValue(value);
+
+        switch (normalized) {
+            case "alto-sinistra":
+            case "in-alto-a-sinistra":
+            case "top-left":
+                return StartupPosition.TOP_LEFT;
+            case "alto-destra":
+            case "in-alto-a-destra":
+            case "top-right":
+                return StartupPosition.TOP_RIGHT;
+            case "basso-sinistra":
+            case "in-basso-a-sinistra":
+            case "bottom-left":
+                return StartupPosition.BOTTOM_LEFT;
+            case "basso-destra":
+            case "in-basso-a-destra":
+            case "bottom-right":
+                return StartupPosition.BOTTOM_RIGHT;
+            case "centro":
+            case "center":
+                return StartupPosition.CENTER;
+            default:
+                return null;
+        }
+    }
+
+    private static String normalizeArgumentValue(String value) {
+        return Normalizer.normalize(value.trim().toLowerCase(), Normalizer.Form.NFD)
+            .replaceAll("\\p{M}", "")
+            .replace('_', '-')
+            .replace(' ', '-');
     }
 }

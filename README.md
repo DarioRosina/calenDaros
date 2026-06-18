@@ -52,6 +52,27 @@ Per approfondire l'idea alla base di calenDaros e le considerazioni fatte nel pa
 
 4. In alternativa, è possibile compilare manualmente con il comando `javac` o utilizzare un IDE come Eclipse o IntelliJ IDEA
 
+## Argomenti di Avvio
+
+L'applicazione può ricevere argomenti da linea di comando per scegliere alcune opzioni iniziali:
+
+- `--always-on-top`: avvia la finestra sempre in primo piano
+- `--top-left`: posiziona la finestra in alto a sinistra
+- `--top-right`: posiziona la finestra in alto a destra
+- `--bottom-left`: posiziona la finestra in basso a sinistra
+- `--bottom-right`: posiziona la finestra in basso a destra
+- `--center`: posiziona la finestra al centro dello schermo
+- `--dark`: avvia l'applicazione con il tema scuro
+- `--light`: avvia l'applicazione con il tema chiaro
+- `--compact`: avvia l'applicazione in modalità compatta
+- `--extended`: avvia l'applicazione in modalità estesa
+
+Esempio:
+
+```bat
+compila_e_avvia.bat --always-on-top --top-right --dark --compact
+```
+
 ## Idee per Futuri Aggiornamenti
 
 ### Funzionalità Avanzate
