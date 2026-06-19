@@ -111,15 +111,18 @@ public class Appuntamenti {
         appointmentPanel.setBackground(color);
         appointmentPanel.setBorder(createAppointmentBorder(color, false));
         appointmentPanel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        Color textColor = getReadableTextColor(color);
         
         JLabel timeLabel = new JLabel(time);
         timeLabel.putClientProperty("appointmentComponent", Boolean.TRUE);
         timeLabel.setFont(new Font("Arial", Font.BOLD, 10));
+        timeLabel.setForeground(textColor);
         timeLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
         
         JLabel titleLabel = new JLabel(title);
         titleLabel.putClientProperty("appointmentComponent", Boolean.TRUE);
         titleLabel.setFont(new Font("Arial", Font.PLAIN, 11));
+        titleLabel.setForeground(textColor);
         titleLabel.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         String tooltip = createAppointmentTooltip(time, title, description);
@@ -314,14 +317,17 @@ public class Appuntamenti {
                     headerPanel.setOpaque(false);
                     JLabel previewTime = new JLabel(time);
                     previewTime.setFont(new Font("Arial", Font.BOLD, 10));
+                    previewTime.setForeground(getReadableTextColor(color));
                     dragModeLabel = new JLabel("+");
                     dragModeLabel.setFont(new Font("Arial", Font.BOLD, 12));
+                    dragModeLabel.setForeground(getReadableTextColor(color));
                     dragModeLabel.setVisible(duplicate);
                     headerPanel.add(previewTime, BorderLayout.WEST);
                     headerPanel.add(dragModeLabel, BorderLayout.EAST);
 
                     JLabel previewTitle = new JLabel(title);
                     previewTitle.setFont(new Font("Arial", Font.PLAIN, 11));
+                    previewTitle.setForeground(getReadableTextColor(color));
                     previewPanel.add(headerPanel);
                     previewPanel.add(previewTitle);
 
@@ -348,6 +354,34 @@ public class Appuntamenti {
                 }
             }
         };
+    }
+
+    private static Color getReadableTextColor(Color background) {
+        return getContrastRatio(background, Color.BLACK) >= getContrastRatio(background, Color.WHITE)
+            ? new Color(17, 24, 39)
+            : Color.WHITE;
+    }
+
+    private static double getContrastRatio(Color first, Color second) {
+        double firstLuminance = getRelativeLuminance(first);
+        double secondLuminance = getRelativeLuminance(second);
+        double lighter = Math.max(firstLuminance, secondLuminance);
+        double darker = Math.min(firstLuminance, secondLuminance);
+        return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    private static double getRelativeLuminance(Color color) {
+        double red = linearizeColorChannel(color.getRed());
+        double green = linearizeColorChannel(color.getGreen());
+        double blue = linearizeColorChannel(color.getBlue());
+        return (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+    }
+
+    private static double linearizeColorChannel(int channel) {
+        double value = channel / 255.0;
+        return value <= 0.03928
+            ? value / 12.92
+            : Math.pow((value + 0.055) / 1.055, 2.4);
     }
 
     private static String createAppointmentTooltip(String time, String title, String description) {

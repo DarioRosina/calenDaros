@@ -1,6 +1,8 @@
 # Compilati Java
 *.class
 *.jar
+!lib/
+!lib/flatlaf.jar
 
 # Directory di output
 bin/

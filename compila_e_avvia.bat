@@ -4,6 +4,10 @@ setlocal EnableDelayedExpansion
 set "SCRIPT_DIR=%~dp0"
 set "SRC_DIR=%SCRIPT_DIR%src\dashboard"
 set "BIN_DIR=%SCRIPT_DIR%bin"
+set "LIB_DIR=%SCRIPT_DIR%lib"
+set "FLATLAF_JAR=%LIB_DIR%\flatlaf.jar"
+set "FLATLAF_EXTRAS_JAR=%LIB_DIR%\flatlaf-extras.jar"
+set "JSVG_JAR=%LIB_DIR%\jsvg.jar"
 set "JAR_FILE=%SCRIPT_DIR%CalenDaros.jar"
 set "SOURCES_FILE=%BIN_DIR%\sources.txt"
 
@@ -28,6 +32,29 @@ if errorlevel 1 (
     echo [ERRORE] jar non trovato. Installa un JDK e aggiungi la cartella bin al PATH.
     pause
     exit /b 1
+)
+
+if not exist "%LIB_DIR%" mkdir "%LIB_DIR%"
+if not exist "%FLATLAF_JAR%" (
+    echo [INFO] Download FlatLaf...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $metadata=[xml](Invoke-WebRequest -UseBasicParsing 'https://repo1.maven.org/maven2/com/formdev/flatlaf/maven-metadata.xml').Content; $version=$metadata.metadata.versioning.release; if(-not $version){$version=$metadata.metadata.versioning.latest}; $url='https://repo1.maven.org/maven2/com/formdev/flatlaf/'+$version+'/flatlaf-'+$version+'.jar'; Invoke-WebRequest -UseBasicParsing $url -OutFile '%FLATLAF_JAR%'; Write-Host ('[INFO] FlatLaf ' + $version + ' scaricato.')"
+    if errorlevel 1 (
+        echo [ATTENZIONE] Download FlatLaf non riuscito. L'app usera il Look ^& Feel di sistema.
+    )
+)
+if exist "%FLATLAF_JAR%" if not exist "%FLATLAF_EXTRAS_JAR%" (
+    echo [INFO] Download FlatLaf Extras...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $metadata=[xml](Invoke-WebRequest -UseBasicParsing 'https://repo1.maven.org/maven2/com/formdev/flatlaf-extras/maven-metadata.xml').Content; $version=$metadata.metadata.versioning.release; if(-not $version){$version=$metadata.metadata.versioning.latest}; $url='https://repo1.maven.org/maven2/com/formdev/flatlaf-extras/'+$version+'/flatlaf-extras-'+$version+'.jar'; Invoke-WebRequest -UseBasicParsing $url -OutFile '%FLATLAF_EXTRAS_JAR%'; Write-Host ('[INFO] FlatLaf Extras ' + $version + ' scaricato.')"
+    if errorlevel 1 (
+        echo [ATTENZIONE] Download FlatLaf Extras non riuscito. L'app usera le icone interne.
+    )
+)
+if exist "%FLATLAF_EXTRAS_JAR%" if not exist "%JSVG_JAR%" (
+    echo [INFO] Download JSVG...
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "$ErrorActionPreference='Stop'; $metadata=[xml](Invoke-WebRequest -UseBasicParsing 'https://repo1.maven.org/maven2/com/github/weisj/jsvg/maven-metadata.xml').Content; $version=$metadata.metadata.versioning.release; if(-not $version){$version=$metadata.metadata.versioning.latest}; $url='https://repo1.maven.org/maven2/com/github/weisj/jsvg/'+$version+'/jsvg-'+$version+'.jar'; Invoke-WebRequest -UseBasicParsing $url -OutFile '%JSVG_JAR%'; Write-Host ('[INFO] JSVG ' + $version + ' scaricato.')"
+    if errorlevel 1 (
+        echo [ATTENZIONE] Download JSVG non riuscito. L'app usera le icone interne.
+    )
 )
 
 echo [INFO] Pulizia cartella bin...
@@ -66,6 +93,18 @@ if errorlevel 1 (
 )
 
 echo [INFO] Avvio dell'applicazione...
-java "-Dfile.encoding=UTF-8" -jar "%JAR_FILE%" --always-on-top --top-left --dark %*
+if exist "%FLATLAF_JAR%" (
+    if exist "%FLATLAF_EXTRAS_JAR%" (
+        if exist "%JSVG_JAR%" (
+            java "-Dfile.encoding=UTF-8" -cp "%JAR_FILE%;%FLATLAF_JAR%;%FLATLAF_EXTRAS_JAR%;%JSVG_JAR%" dashboard.Calendario --always-on-top --top-left --dark %*
+        ) else (
+            java "-Dfile.encoding=UTF-8" -cp "%JAR_FILE%;%FLATLAF_JAR%;%FLATLAF_EXTRAS_JAR%" dashboard.Calendario --always-on-top --top-left --dark %*
+        )
+    ) else (
+        java "-Dfile.encoding=UTF-8" -cp "%JAR_FILE%;%FLATLAF_JAR%" dashboard.Calendario --always-on-top --top-left --dark %*
+    )
+) else (
+    java "-Dfile.encoding=UTF-8" -jar "%JAR_FILE%" --always-on-top --top-left --dark %*
+)
 
 pause

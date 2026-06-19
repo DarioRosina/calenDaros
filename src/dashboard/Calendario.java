@@ -8,10 +8,13 @@ import dashboard.i18n.Calendar_i18n;
 
 import java.awt.*;
 import java.awt.event.*;
+import java.awt.geom.RoundRectangle2D;
 import javax.swing.Painter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -32,6 +35,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.UUID;
+import java.util.function.Function;
 
 /**
  * Applicazione calendario per la visualizzazione e gestione degli appuntamenti.
@@ -63,6 +67,8 @@ public class Calendario extends JFrame {
     // Main panel components
     private JPanel mainPanel;
     private JPanel appointmentPanel;
+    private JPanel dayOfWeekHeaderPanel;
+    private JPanel appointmentGridPanel;
     private JPanel detailsContentPanel;
     
     /**
@@ -93,13 +99,23 @@ public class Calendario extends JFrame {
     private static final Dimension LEFT_COMPACT_SIZE = new Dimension(250, 250);
     private static final Dimension DETAILS_PANEL_SIZE = new Dimension(0, 185);
     private static final Dimension NAVIGATION_ICON_BUTTON_SIZE = new Dimension(42, 28);
+    private static final int MATERIAL_ICON_SIZE = 16;
+    private static final int MONTH_ARROW_ICON_SIZE = 20;
+    private static final Color ICON_EDIT_COLOR = new Color(234, 179, 8);
+    private static final Color ICON_SAVE_COLOR = new Color(22, 163, 74);
+    private static final Color ICON_DANGER_COLOR = new Color(220, 38, 38);
+    private static final Color ICON_PIN_ON_COLOR = new Color(22, 163, 74);
+    private static final Color ICON_PIN_OFF_COLOR = new Color(220, 38, 38);
     private static final Path APPOINTMENTS_FILE = Paths.get(
         System.getProperty("user.home"), ".calenDaros", "appointments.properties");
+    private static final Path UI_SETTINGS_FILE = Paths.get(
+        System.getProperty("user.home"), ".calenDaros", "ui.properties");
     
     // Flag per tracciare la modalità di visualizzazione corrente
     private boolean compactMode = true;
     private boolean alwaysOnTopMode = false;
     private boolean darkMode = false;
+    private Dimension extendedWindowSize = new Dimension(1020, 885);
 
     private static class CalendarAppointment {
         private final int year;
@@ -279,6 +295,7 @@ public class Calendario extends JFrame {
         this.startupPosition = startupPosition;
         this.darkMode = darkMode;
         this.compactMode = compactMode;
+        loadUiSettingsFromDisk();
         configureTooltips();
         initializeFrame();
         initializeCalendar();
@@ -330,17 +347,19 @@ public class Calendario extends JFrame {
         monthLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 8, 0));
         
         // Create navigation buttons panel
-        JPanel navButtonsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+        JPanel navButtonsPanel = createToolbarButtonPanel();
         markSidebarComponent(navButtonsPanel);
         
         // Style the navigation buttons
-        prevButton = createStyledButton("<<", getControlBackground());
+        prevButton = createStyledButton("", getControlBackground());
+        setMonthArrowIcon(prevButton, "chevron_left", "<<");
         todayButton = createStyledButton("", getControlBackground());
-        todayButton.setIcon(createTodayIcon(getControlForeground()));
+        todayButton.setIcon(createTodayIcon());
         todayButton.setToolTipText(Calendar_i18n.getString("button.today"));
         todayButton.getAccessibleContext().setAccessibleName(Calendar_i18n.getString("button.today"));
         styleNavigationIconButton(todayButton);
-        nextButton = createStyledButton(">>", getControlBackground());
+        nextButton = createStyledButton("", getControlBackground());
+        setMonthArrowIcon(nextButton, "chevron_right", ">>");
         
         // Add buttons to panel
         navButtonsPanel.add(prevButton);
@@ -483,6 +502,15 @@ public class Calendario extends JFrame {
         appointmentPanel.addComponentListener(sizeLogger);
         controlsPanel.addComponentListener(sizeLogger);
         mainPanel.addComponentListener(sizeLogger);
+
+        addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                if (!compactMode && mainPanel != null && mainPanel.isVisible()) {
+                    rememberExtendedWindowSize();
+                }
+            }
+        });
     }
 
     private void finalizeSetup() {
@@ -499,7 +527,7 @@ public class Calendario extends JFrame {
         pack();
 
         // Reset to desired size after packing
-        setSize(compactMode ? getCompactWindowWidth() : 1020, compactMode ? 400 : 885);
+        setSize(compactMode ? new Dimension(getCompactWindowWidth(), 400) : extendedWindowSize);
         applyStartupPosition();
     }
 
@@ -553,19 +581,8 @@ public class Calendario extends JFrame {
     }
     
     private void updateAppointmentPanel() {
-        appointmentPanel.removeAll();
-        appointmentPanel.setLayout(new GridLayout(0, 7, 1, 1)); // Forza 7 colonne
-        
-        // Intestazioni dei giorni usando l'enum
-        for (DayOfWeek day : DayOfWeek.values()) {
-            JLabel label = new JLabel(day.getDisplayName(), SwingConstants.CENTER);
-            label.setBorder(createDayOfWeekHeaderBorder());
-            label.setFont(new Font("Arial", Font.BOLD, 12));
-            label.setForeground(day.isWeekend() ? getWeekendTextColor(true) : getTextColor());
-            label.setBackground(getHeaderBackground());
-            label.setOpaque(true);
-            appointmentPanel.add(label);
-        }
+        appointmentGridPanel.removeAll();
+        updateDayOfWeekHeaderPanel();
         
         Calendar firstVisibleDay = (Calendar) calendar.clone();
         firstVisibleDay.set(Calendar.DAY_OF_MONTH, 1);
@@ -593,6 +610,7 @@ public class Calendario extends JFrame {
             dayPanel.putClientProperty("calendarDay", currentDay);
             dayPanel.putClientProperty("calendarMonth", currentMonth);
             dayPanel.putClientProperty("calendarYear", currentYear);
+            dayPanel.setCursor(new Cursor(Cursor.HAND_CURSOR));
             
             // Verifica se questo è il giorno selezionato
             boolean isSelectedDay = currentYear == calendar.get(Calendar.YEAR)
@@ -656,11 +674,11 @@ public class Calendario extends JFrame {
     
             addCustomAppointments(dayPanel, currentYear, currentMonth, currentDay);
     
-            appointmentPanel.add(dayPanel);
+            appointmentGridPanel.add(dayPanel);
         }
 
-        appointmentPanel.revalidate();
-        appointmentPanel.repaint();
+        appointmentGridPanel.revalidate();
+        appointmentGridPanel.repaint();
     }
 
     private void addCustomAppointments(JPanel dayPanel, int year, int month, int day) {
@@ -739,28 +757,34 @@ public class Calendario extends JFrame {
         StringBuilder tooltip = new StringBuilder(
             "<html><body style='width:180px; padding:4px; font-family:Arial; font-size:11px'>");
         boolean hasAppointments = false;
+        List<CalendarAppointment> appointmentsForDay = new ArrayList<>();
 
         for (CalendarAppointment appointment : customAppointments) {
             if (appointment.year == calendar.get(Calendar.YEAR) &&
                     appointment.month == calendar.get(Calendar.MONTH) &&
                     appointment.day == day &&
                     isAppointmentTypeVisible(appointment.type)) {
-                if (hasAppointments) {
-                    tooltip.append("<br>");
-                }
-                String description = appointment.description == null ? "" : appointment.description;
-                tooltip.append("<b>")
-                    .append(escapeHtml(appointment.time == null ? "" : appointment.time))
-                    .append("</b> <span style='font-weight:bold'>")
-                    .append(escapeHtml(appointment.title == null ? "" : appointment.title))
-                    .append("</span>");
-                if (!description.trim().isEmpty()) {
-                    tooltip.append("<br><span style='font-size:9px; color:#4B5563'>")
-                        .append(escapeHtml(description))
-                        .append("</span>");
-                }
-                hasAppointments = true;
+                appointmentsForDay.add(appointment);
             }
+        }
+
+        appointmentsForDay.sort(Comparator.comparingInt(appointment -> parseTimeToMinutes(appointment.time)));
+        for (CalendarAppointment appointment : appointmentsForDay) {
+            if (hasAppointments) {
+                tooltip.append("<br>");
+            }
+            String description = appointment.description == null ? "" : appointment.description;
+            tooltip.append("<b>")
+                .append(escapeHtml(appointment.time == null ? "" : appointment.time))
+                .append("</b> <span style='font-weight:bold'>")
+                .append(escapeHtml(appointment.title == null ? "" : appointment.title))
+                .append("</span>");
+            if (!description.trim().isEmpty()) {
+                tooltip.append("<br><span style='font-size:9px; color:#4B5563'>")
+                    .append(escapeHtml(description))
+                    .append("</span>");
+            }
+            hasAppointments = true;
         }
 
         if (!hasAppointments) {
@@ -905,8 +929,8 @@ public class Calendario extends JFrame {
         if (editable) {
             JPanel buttonPanel = new JPanel();
             buttonPanel.setLayout(new BoxLayout(buttonPanel, BoxLayout.Y_AXIS));
-            JButton cancelButton = createIconButton(createCancelIcon(new Color(210, 45, 45)), Calendar_i18n.getString("button.cancel"));
-            JButton saveButton = createIconButton(createSaveIcon(getControlForeground()), Calendar_i18n.getString("button.save"));
+            JButton cancelButton = createIconButton(createCancelIcon(), Calendar_i18n.getString("button.cancel"));
+            JButton saveButton = createIconButton(createSaveIcon(), Calendar_i18n.getString("button.save"));
             cancelButton.setAlignmentX(Component.CENTER_ALIGNMENT);
             saveButton.setAlignmentX(Component.CENTER_ALIGNMENT);
             buttonPanel.add(saveButton);
@@ -948,8 +972,8 @@ public class Calendario extends JFrame {
             JPanel actionPanel = new JPanel();
             actionPanel.setLayout(new BoxLayout(actionPanel, BoxLayout.Y_AXIS));
 
-            JButton editButton = createIconButton(createPencilIcon(getControlForeground()), Calendar_i18n.getString("button.edit"));
-            JButton deleteButton = createIconButton(createTrashIcon(new Color(210, 45, 45)), Calendar_i18n.getString("button.delete"));
+            JButton editButton = createIconButton(createPencilIcon(), Calendar_i18n.getString("button.edit"));
+            JButton deleteButton = createIconButton(createTrashIcon(), Calendar_i18n.getString("button.delete"));
             editButton.setAlignmentX(Component.CENTER_ALIGNMENT);
             deleteButton.setAlignmentX(Component.CENTER_ALIGNMENT);
             actionPanel.add(editButton);
@@ -1072,11 +1096,38 @@ public class Calendario extends JFrame {
             BorderFactory.createEmptyBorder(4, 6, 4, 6)
         ));
         button.setFocusable(false);
+        button.setCursor(new Cursor(Cursor.HAND_CURSOR));
         return button;
     }
 
-    private Icon createPencilIcon(Color color) {
-        return new Icon() {
+    private Icon createMaterialIcon(String name, Color color, Icon fallback) {
+        return createMaterialIcon(name, MATERIAL_ICON_SIZE, color, fallback);
+    }
+
+    private Icon createMaterialIcon(String name, int size, Color color, Icon fallback) {
+        try {
+            Class<?> svgIconClass = Class.forName("com.formdev.flatlaf.extras.FlatSVGIcon");
+            Constructor<?> constructor = svgIconClass.getConstructor(String.class, int.class, int.class);
+            Object icon = constructor.newInstance("dashboard/img/material/" + name + ".svg", size, size);
+            applyMaterialIconColor(svgIconClass, icon, color);
+            return icon instanceof Icon ? (Icon) icon : fallback;
+        } catch (ReflectiveOperationException | LinkageError e) {
+            return fallback;
+        }
+    }
+
+    private void applyMaterialIconColor(Class<?> svgIconClass, Object icon, Color color)
+            throws ReflectiveOperationException {
+        Class<?> colorFilterClass = Class.forName("com.formdev.flatlaf.extras.FlatSVGIcon$ColorFilter");
+        Constructor<?> colorFilterConstructor = colorFilterClass.getConstructor(Function.class);
+        Object colorFilter = colorFilterConstructor.newInstance((Function<Color, Color>) original -> color);
+        Method setColorFilterMethod = svgIconClass.getMethod("setColorFilter", colorFilterClass);
+        setColorFilterMethod.invoke(icon, colorFilter);
+    }
+
+    private Icon createPencilIcon() {
+        Color color = ICON_EDIT_COLOR;
+        Icon fallback = new Icon() {
             @Override
             public int getIconWidth() {
                 return 16;
@@ -1090,23 +1141,79 @@ public class Calendario extends JFrame {
             @Override
             public void paintIcon(Component c, Graphics g, int x, int y) {
                 Graphics2D g2 = (Graphics2D) g.create();
+
+                g2.rotate(Math.toRadians(90), 8, 8);
+
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-                g2.setColor(color);
-                g2.setStroke(new BasicStroke(2.2f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-                g2.drawLine(x + 4, y + 12, x + 12, y + 4);
-                g2.drawLine(x + 10, y + 3, x + 13, y + 6);
-                g2.fillPolygon(
-                    new int[] { x + 3, x + 5, x + 4 },
-                    new int[] { y + 13, y + 12, y + 14 },
+                g2.translate(x + 8, y-22);
+                g2.rotate(Math.toRadians(-45), 8, 8);
+
+                BasicStroke thick = new BasicStroke(1.4f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
+                BasicStroke thin  = new BasicStroke(0.8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
+                Color outline = new Color(26, 26, 26);
+
+                // === GOMMA (rosa) ===
+                RoundRectangle2D eraser = new RoundRectangle2D.Float(4f, 0.5f, 8f, 3f, 2f, 2f);
+                g2.setColor(new Color(242, 139, 130));
+                g2.fill(eraser);
+                g2.setColor(outline);
+                g2.setStroke(thick);
+                g2.draw(eraser);
+
+                // === FASCETTA (grigio metallo, 2 anelli) ===
+                g2.setColor(new Color(176, 184, 193));
+                g2.fillRect(5, 3, 6, 3);
+                g2.setColor(outline);
+                g2.setStroke(thick);
+                g2.draw(new RoundRectangle2D.Float(4.5f, 3.2f, 7f, 1.3f, 1f, 1f));
+                g2.draw(new RoundRectangle2D.Float(4.5f, 4.7f, 7f, 1.3f, 1f, 1f));
+
+                // === CORPO (giallo) ===
+                g2.setColor(new Color(255, 214, 0));
+                g2.fillRect(4, 6, 8, 7);
+                g2.setColor(outline);
+                g2.setStroke(thick);
+                g2.drawRect(4, 6, 8, 7);
+                g2.setStroke(thin);
+                g2.drawLine(7, 6, 7, 13);
+                g2.drawLine(10, 6, 10, 13);
+
+                // === PUNTA (legno beige) ===
+                Polygon tip = new Polygon(
+                    new int[] { 4, 8, 12 },
+                    new int[] { 13, 16, 13 },
                     3
                 );
+                g2.setColor(new Color(242, 201, 138));
+                g2.fillPolygon(tip);
+                g2.setColor(outline);
+                g2.setStroke(thick);
+                g2.drawPolygon(tip);
+                g2.setStroke(thin);
+                g2.drawLine(7, 13, 8, 15);
+                g2.drawLine(10, 13, 8, 15);
+
+                // === MINA (grigio ardesia) ===
+                Polygon mine = new Polygon(
+                    new int[] { 6, 8, 10 },
+                    new int[] { 15, 16, 15 },
+                    3
+                );
+                g2.setColor(new Color(74, 85, 104));
+                g2.fillPolygon(mine);
+                g2.setColor(outline);
+                g2.setStroke(thin);
+                g2.drawPolygon(mine);
+
                 g2.dispose();
             }
         };
+        return createMaterialIcon("edit", color, fallback);
     }
 
-    private Icon createSaveIcon(Color color) {
-        return new Icon() {
+    private Icon createSaveIcon() {
+        Color color = ICON_SAVE_COLOR;
+        Icon fallback = new Icon() {
             @Override
             public int getIconWidth() {
                 return 16;
@@ -1133,10 +1240,12 @@ public class Calendario extends JFrame {
                 g2.dispose();
             }
         };
+        return createMaterialIcon("save", color, fallback);
     }
 
-    private Icon createCancelIcon(Color color) {
-        return new Icon() {
+    private Icon createCancelIcon() {
+        Color color = ICON_DANGER_COLOR;
+        Icon fallback = new Icon() {
             @Override
             public int getIconWidth() {
                 return 16;
@@ -1158,10 +1267,12 @@ public class Calendario extends JFrame {
                 g2.dispose();
             }
         };
+        return createMaterialIcon("close", color, fallback);
     }
 
-    private Icon createTodayIcon(Color color) {
-        return new Icon() {
+    private Icon createTodayIcon() {
+        Color color = getControlForeground();
+        Icon fallback = new Icon() {
             @Override
             public int getIconWidth() {
                 return 16;
@@ -1183,18 +1294,19 @@ public class Calendario extends JFrame {
                 g2.dispose();
             }
         };
+        return createMaterialIcon("calendar_today", color, fallback);
     }
 
     private Icon createLanguageIcon(boolean italianFlag) {
-        return new Icon() {
+        Icon fallback = new Icon() {
             @Override
             public int getIconWidth() {
-                return 18;
+                return 16;
             }
 
             @Override
             public int getIconHeight() {
-                return 14;
+                return 16;
             }
 
             @Override
@@ -1202,49 +1314,52 @@ public class Calendario extends JFrame {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
                 int flagX = x + 1;
-                int flagY = y + 2;
-                int width = 16;
+                int flagY = y + 3;
+                int width = 14;
                 int height = 10;
+                RoundRectangle2D flagShape = new RoundRectangle2D.Float(flagX, flagY, width, height, 3, 3);
                 Shape oldClip = g2.getClip();
-                g2.setClip(flagX, flagY, width, height);
+                g2.setClip(flagShape);
 
                 if (italianFlag) {
                     g2.setColor(new Color(0, 146, 70));
                     g2.fillRect(flagX, flagY, 5, height);
                     g2.setColor(Color.WHITE);
-                    g2.fillRect(flagX + 5, flagY, 6, height);
+                    g2.fillRect(flagX + 5, flagY, 5, height);
                     g2.setColor(new Color(206, 43, 55));
-                    g2.fillRect(flagX + 11, flagY, 5, height);
+                    g2.fillRect(flagX + 10, flagY, 4, height);
                 } else {
                     g2.setColor(new Color(1, 33, 105));
                     g2.fillRect(flagX, flagY, width, height);
                     g2.setColor(Color.WHITE);
-                    g2.setStroke(new BasicStroke(3.2f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
+                    g2.setStroke(new BasicStroke(3f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
                     g2.drawLine(flagX, flagY, flagX + width, flagY + height);
                     g2.drawLine(flagX + width, flagY, flagX, flagY + height);
                     g2.setColor(new Color(200, 16, 46));
-                    g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
+                    g2.setStroke(new BasicStroke(1.4f, BasicStroke.CAP_BUTT, BasicStroke.JOIN_MITER));
                     g2.drawLine(flagX, flagY, flagX + width, flagY + height);
                     g2.drawLine(flagX + width, flagY, flagX, flagY + height);
                     g2.setColor(Color.WHITE);
-                    g2.fillRect(flagX + 6, flagY, 4, height);
+                    g2.fillRect(flagX + 5, flagY, 4, height);
                     g2.fillRect(flagX, flagY + 3, width, 4);
                     g2.setColor(new Color(200, 16, 46));
-                    g2.fillRect(flagX + 7, flagY, 2, height);
+                    g2.fillRect(flagX + 6, flagY, 2, height);
                     g2.fillRect(flagX, flagY + 4, width, 2);
                 }
 
                 g2.setClip(oldClip);
-                g2.setColor(getBorderColor());
+                g2.setColor(darkMode ? new Color(108, 116, 132) : new Color(156, 163, 175));
                 g2.setStroke(new BasicStroke(1f));
-                g2.drawRoundRect(flagX, flagY, width, height, 2, 2);
+                g2.draw(flagShape);
                 g2.dispose();
             }
         };
+        return fallback;
     }
 
-    private Icon createViewModeIcon(Color color, boolean compact) {
-        return new Icon() {
+    private Icon createViewModeIcon(boolean compact) {
+        Color color = getControlForeground();
+        Icon fallback = new Icon() {
             @Override
             public int getIconWidth() {
                 return 16;
@@ -1275,10 +1390,12 @@ public class Calendario extends JFrame {
                 g2.dispose();
             }
         };
+        return createMaterialIcon(compact ? "close_fullscreen" : "open_in_full", color, fallback);
     }
 
-    private Icon createAlwaysOnTopIcon(Color color, boolean active) {
-        return new Icon() {
+    private Icon createAlwaysOnTopIcon(boolean active) {
+        Color color = active ? ICON_PIN_ON_COLOR : ICON_PIN_OFF_COLOR;
+        Icon fallback = new Icon() {
             @Override
             public int getIconWidth() {
                 return 16;
@@ -1321,10 +1438,12 @@ public class Calendario extends JFrame {
                 g2.dispose();
             }
         };
+        return createMaterialIcon(active ? "push_pin" : "keep_off", color, fallback);
     }
 
-    private Icon createImportIcon(Color color) {
-        return new Icon() {
+    private Icon createImportIcon() {
+        Color color = getControlForeground();
+        Icon fallback = new Icon() {
             @Override
             public int getIconWidth() {
                 return 16;
@@ -1350,10 +1469,12 @@ public class Calendario extends JFrame {
                 g2.dispose();
             }
         };
+        return createMaterialIcon("file_download", color, fallback);
     }
 
-    private Icon createExportIcon(Color color) {
-        return new Icon() {
+    private Icon createExportIcon() {
+        Color color = getControlForeground();
+        Icon fallback = new Icon() {
             @Override
             public int getIconWidth() {
                 return 16;
@@ -1379,10 +1500,12 @@ public class Calendario extends JFrame {
                 g2.dispose();
             }
         };
+        return createMaterialIcon("file_upload", color, fallback);
     }
 
-    private Icon createThemeIcon(Color color, boolean dark) {
-        return new Icon() {
+    private Icon createThemeIcon(boolean dark) {
+        Color color = getControlForeground();
+        Icon fallback = new Icon() {
             @Override
             public int getIconWidth() {
                 return 16;
@@ -1417,10 +1540,12 @@ public class Calendario extends JFrame {
                 g2.dispose();
             }
         };
+        return createMaterialIcon(dark ? "dark_mode" : "light_mode", color, fallback);
     }
 
-    private Icon createTrashIcon(Color color) {
-        return new Icon() {
+    private Icon createTrashIcon() {
+        Color color = ICON_DANGER_COLOR;
+        Icon fallback = new Icon() {
             @Override
             public int getIconWidth() {
                 return 16;
@@ -1446,6 +1571,7 @@ public class Calendario extends JFrame {
                 g2.dispose();
             }
         };
+        return createMaterialIcon("delete", color, fallback);
     }
 
     private void showEmptyAppointmentForm() {
@@ -2046,6 +2172,39 @@ public class Calendario extends JFrame {
                 JOptionPane.WARNING_MESSAGE);
         }
     }
+
+    private void loadUiSettingsFromDisk() {
+        if (!Files.exists(UI_SETTINGS_FILE)) {
+            return;
+        }
+
+        Properties properties = new Properties();
+        try (InputStream input = Files.newInputStream(UI_SETTINGS_FILE)) {
+            properties.load(input);
+            int width = Integer.parseInt(properties.getProperty("extended.width", String.valueOf(extendedWindowSize.width)));
+            int height = Integer.parseInt(properties.getProperty("extended.height", String.valueOf(extendedWindowSize.height)));
+            if (width >= 640 && height >= 480) {
+                extendedWindowSize = new Dimension(width, height);
+            }
+        } catch (IOException | NumberFormatException e) {
+            System.err.println("Impossibile caricare le preferenze UI: " + e.getMessage());
+        }
+    }
+
+    private void saveUiSettingsToDisk() {
+        Properties properties = new Properties();
+        properties.setProperty("extended.width", String.valueOf(extendedWindowSize.width));
+        properties.setProperty("extended.height", String.valueOf(extendedWindowSize.height));
+
+        try {
+            Files.createDirectories(UI_SETTINGS_FILE.getParent());
+            try (OutputStream output = Files.newOutputStream(UI_SETTINGS_FILE)) {
+                properties.store(output, "calenDaros UI settings");
+            }
+        } catch (IOException e) {
+            System.err.println("Impossibile salvare le preferenze UI: " + e.getMessage());
+        }
+    }
     
     /**
      * Toggles between compact and extended view modes
@@ -2069,6 +2228,9 @@ public class Calendario extends JFrame {
 
     private void toggleThemeMode() {
         darkMode = !darkMode;
+        setupModernLookAndFeel(darkMode);
+        configureTooltips();
+        SwingUtilities.updateComponentTreeUI(this);
         populateControlsPanel();
         applyTheme();
         miniCalendarPanel.updateDisplay();
@@ -2077,6 +2239,11 @@ public class Calendario extends JFrame {
     }
 
     private void toggleViewMode() {
+        boolean wasCompactMode = compactMode;
+        if (!wasCompactMode) {
+            rememberExtendedWindowSize();
+        }
+
         compactMode = !compactMode;
         populateControlsPanel();
         updateLeftPanelSize();
@@ -2091,8 +2258,7 @@ public class Calendario extends JFrame {
             // Switch back to extended mode
             miniCalendarPanel.setVisible(false);
             mainPanel.setVisible(true);
-            // Restore original size
-            setSize(1020, 885);
+            setSize(extendedWindowSize);
         }
         
         // Update the UI
@@ -2100,6 +2266,16 @@ public class Calendario extends JFrame {
         miniCalendarPanel.updateDisplay();
         revalidate();
         repaint();
+    }
+
+    private void rememberExtendedWindowSize() {
+        Dimension currentSize = getSize();
+        if (currentSize.width > getCompactWindowWidth()
+                && currentSize.height > 0
+                && !currentSize.equals(extendedWindowSize)) {
+            extendedWindowSize = new Dimension(currentSize);
+            saveUiSettingsToDisk();
+        }
     }
 
     private int getCompactWindowWidth() {
@@ -2286,7 +2462,7 @@ public class Calendario extends JFrame {
         checkboxPanel.add(otherCheckbox);
         
         // Create buttons panel
-        JPanel buttonsPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+        JPanel buttonsPanel = createToolbarButtonPanel(10);
         markSidebarComponent(buttonsPanel);
         buttonsPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
         alignSidebarComponent(buttonsPanel);
@@ -2300,7 +2476,7 @@ public class Calendario extends JFrame {
         // Add toggle view button
         String viewModeText = compactMode ? Calendar_i18n.getString("button.extended_mode") : Calendar_i18n.getString("button.compact_mode");
         JButton toggleViewButton = createStyledButton("", getControlBackground());
-        toggleViewButton.setIcon(createViewModeIcon(getControlForeground(), !compactMode));
+        toggleViewButton.setIcon(createViewModeIcon(!compactMode));
         toggleViewButton.setToolTipText(viewModeText);
         toggleViewButton.getAccessibleContext().setAccessibleName(viewModeText);
         toggleViewButton.addActionListener(e -> toggleViewMode());
@@ -2309,7 +2485,7 @@ public class Calendario extends JFrame {
             ? Calendar_i18n.getString("button.always_on_top_on")
             : Calendar_i18n.getString("button.always_on_top_off");
         JButton alwaysOnTopButton = createStyledButton("", getControlBackground());
-        alwaysOnTopButton.setIcon(createAlwaysOnTopIcon(getControlForeground(), !alwaysOnTopMode));
+        alwaysOnTopButton.setIcon(createAlwaysOnTopIcon(!alwaysOnTopMode));
         alwaysOnTopButton.setToolTipText(alwaysOnTopText);
         alwaysOnTopButton.getAccessibleContext().setAccessibleName(alwaysOnTopText);
         alwaysOnTopButton.addActionListener(e -> toggleAlwaysOnTopMode());
@@ -2322,17 +2498,17 @@ public class Calendario extends JFrame {
         buttonsPanel.add(toggleViewButton); // Add the toggle button
         buttonsPanel.add(alwaysOnTopButton);
 
-        JPanel importPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+        JPanel importPanel = createToolbarButtonPanel(10);
         markSidebarComponent(importPanel);
         importPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
         alignSidebarComponent(importPanel);
         JButton importButton = createStyledButton("", getControlBackground());
-        importButton.setIcon(createImportIcon(getControlForeground()));
+        importButton.setIcon(createImportIcon());
         importButton.setToolTipText(Calendar_i18n.getString("button.import_tooltip"));
         importButton.getAccessibleContext().setAccessibleName(Calendar_i18n.getString("button.import"));
         importButton.addActionListener(e -> importAppointmentsFromIcs());
         JButton exportButton = createStyledButton("", getControlBackground());
-        exportButton.setIcon(createExportIcon(getControlForeground()));
+        exportButton.setIcon(createExportIcon());
         exportButton.setToolTipText(Calendar_i18n.getString("button.export_tooltip"));
         exportButton.getAccessibleContext().setAccessibleName(Calendar_i18n.getString("button.export"));
         exportButton.addActionListener(e -> exportAppointmentsToIcs());
@@ -2340,7 +2516,7 @@ public class Calendario extends JFrame {
             ? Calendar_i18n.getString("button.light_theme")
             : Calendar_i18n.getString("button.dark_theme");
         JButton themeButton = createStyledButton("", getControlBackground());
-        themeButton.setIcon(createThemeIcon(getControlForeground(), !darkMode));
+        themeButton.setIcon(createThemeIcon(!darkMode));
         themeButton.setToolTipText(Calendar_i18n.getString("button.theme_tooltip"));
         themeButton.getAccessibleContext().setAccessibleName(themeButtonText);
         themeButton.addActionListener(e -> toggleThemeMode());
@@ -2409,7 +2585,7 @@ public class Calendario extends JFrame {
     }
 
     private JLabel createVersionLink() {
-        JLabel versionLink = new JLabel("<html><u>CalenDaros v1.0.2</u></html>");
+        JLabel versionLink = new JLabel("<html><u>CalenDaros v1.0.3</u></html>");
         versionLink.putClientProperty("versionLink", Boolean.TRUE);
         versionLink.setFont(new Font("Arial", Font.BOLD, 11));
         versionLink.setForeground(getLinkColor());
@@ -2488,6 +2664,33 @@ public class Calendario extends JFrame {
         styleNavigationIconButton(button, NAVIGATION_ICON_BUTTON_SIZE);
     }
 
+    private JPanel createToolbarButtonPanel() {
+        return createToolbarButtonPanel(0);
+    }
+
+    private JPanel createToolbarButtonPanel(int bottomGap) {
+        JPanel panel = new JPanel(new GridLayout(1, 3, 6, 0));
+        int width = (NAVIGATION_ICON_BUTTON_SIZE.width * 3) + 12;
+        Dimension size = new Dimension(width, NAVIGATION_ICON_BUTTON_SIZE.height + bottomGap);
+        panel.setPreferredSize(size);
+        panel.setMinimumSize(size);
+        panel.setMaximumSize(size);
+        panel.setAlignmentX(Component.LEFT_ALIGNMENT);
+        return panel;
+    }
+
+    private void setMonthArrowIcon(JButton button, String iconName, String fallbackText) {
+        button.setText("");
+        button.setIcon(createMaterialIcon(iconName, MONTH_ARROW_ICON_SIZE, getMonthArrowIconColor(), null));
+        if (button.getIcon() == null) {
+            button.setText(fallbackText);
+        }
+    }
+
+    private Color getMonthArrowIconColor() {
+        return darkMode ? getControlForeground() : new Color(17, 24, 39);
+    }
+
     private void styleNavigationIconButton(JButton button, Dimension size) {
         Dimension buttonSize = new Dimension(size);
         button.setPreferredSize(buttonSize);
@@ -2546,8 +2749,14 @@ public class Calendario extends JFrame {
         updateNavigationButtonTheme(prevButton);
         updateNavigationButtonTheme(todayButton);
         updateNavigationButtonTheme(nextButton);
+        if (prevButton != null) {
+            setMonthArrowIcon(prevButton, "chevron_left", "<<");
+        }
         if (todayButton != null) {
-            todayButton.setIcon(createTodayIcon(getControlForeground()));
+            todayButton.setIcon(createTodayIcon());
+        }
+        if (nextButton != null) {
+            setMonthArrowIcon(nextButton, "chevron_right", ">>");
         }
         if (leftPanel != null) {
             leftPanel.setBackground(getPanelBackground());
@@ -2622,11 +2831,20 @@ public class Calendario extends JFrame {
     }
 
     private void createAppointmentPanel() {
-        // Create appointment panel with grid layout
-        appointmentPanel = new JPanel();
-        appointmentPanel.setLayout(new GridLayout(0, 7, 1, 1)); // Force 7 columns
+        appointmentPanel = new JPanel(new BorderLayout(0, 1));
         appointmentPanel.setBorder(BorderFactory.createEmptyBorder(5, 5, 5, 5));
         appointmentPanel.setOpaque(false);
+
+        dayOfWeekHeaderPanel = new JPanel(new GridLayout(1, 7, 1, 0));
+        dayOfWeekHeaderPanel.setOpaque(false);
+        dayOfWeekHeaderPanel.setPreferredSize(new Dimension(0, 26));
+        dayOfWeekHeaderPanel.setMinimumSize(new Dimension(0, 26));
+        updateDayOfWeekHeaderPanel();
+
+        appointmentGridPanel = new JPanel(new GridLayout(6, 7, 1, 1));
+        appointmentGridPanel.setOpaque(false);
+        appointmentPanel.add(dayOfWeekHeaderPanel, BorderLayout.NORTH);
+        appointmentPanel.add(appointmentGridPanel, BorderLayout.CENTER);
         
         // Create a scroll pane for the appointment panel
         JScrollPane scrollPane = new JScrollPane(appointmentPanel);
@@ -2641,6 +2859,25 @@ public class Calendario extends JFrame {
         
         // Initial update of the appointment panel
         updateAppointmentPanel();
+    }
+
+    private void updateDayOfWeekHeaderPanel() {
+        if (dayOfWeekHeaderPanel == null) {
+            return;
+        }
+
+        dayOfWeekHeaderPanel.removeAll();
+        for (DayOfWeek day : DayOfWeek.values()) {
+            JLabel label = new JLabel(day.getDisplayName(), SwingConstants.CENTER);
+            label.setBorder(createDayOfWeekHeaderBorder());
+            label.setFont(new Font("Arial", Font.BOLD, 12));
+            label.setForeground(day.isWeekend() ? getWeekendTextColor(true) : getTextColor());
+            label.setBackground(getHeaderBackground());
+            label.setOpaque(true);
+            dayOfWeekHeaderPanel.add(label);
+        }
+        dayOfWeekHeaderPanel.revalidate();
+        dayOfWeekHeaderPanel.repaint();
     }
 
     private void createDetailsPanel() {
@@ -2707,30 +2944,54 @@ public class Calendario extends JFrame {
         });
     }
 
+    private static void setupModernLookAndFeel(boolean darkMode) {
+        configureFlatLafDefaults();
+
+        try {
+            String lafClassName = darkMode
+                ? "com.formdev.flatlaf.FlatDarkLaf"
+                : "com.formdev.flatlaf.FlatLightLaf";
+            Class<?> lafClass = Class.forName(lafClassName);
+            Method setupMethod = lafClass.getMethod("setup");
+            setupMethod.invoke(null);
+            return;
+        } catch (ReflectiveOperationException | LinkageError e) {
+            System.err.println("FlatLaf non disponibile, uso il Look & Feel di sistema: " + e.getMessage());
+        }
+
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception e) {
+            System.err.println("Impossibile impostare il Look & Feel di sistema: " + e.getMessage());
+        }
+    }
+
+    private static void configureFlatLafDefaults() {
+        System.setProperty("flatlaf.useWindowDecorations", "true");
+        UIManager.put("Component.arc", 10);
+        UIManager.put("Button.arc", 10);
+        UIManager.put("CheckBox.arc", 6);
+        UIManager.put("TextComponent.arc", 8);
+        UIManager.put("ScrollBar.showButtons", false);
+        UIManager.put("ScrollBar.width", 12);
+        UIManager.put("TabbedPane.showTabSeparators", true);
+    }
+
     /**
      * Metodo principale che avvia l'applicazione Calendario.
-     * Imposta il look and feel Nimbus e crea l'istanza del calendario.
+     * Imposta il look and feel FlatLaf e crea l'istanza del calendario.
      * 
      * @param args argomenti da linea di comando
      */
     public static void main(String[] args) {
-        try {
-            // Set Nimbus Look and Feel
-            for (UIManager.LookAndFeelInfo info : UIManager.getInstalledLookAndFeels()) {
-                if ("Nimbus".equals(info.getName())) {
-                    UIManager.setLookAndFeel(info.getClassName());
-                    break;
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        configureTooltips();
-        
         boolean startAlwaysOnTop = shouldStartAlwaysOnTop(args);
         StartupPosition startupPosition = getStartupPosition(args);
         boolean startDarkMode = shouldStartDarkMode(args);
         boolean startCompactMode = shouldStartCompactMode(args);
+
+        setupModernLookAndFeel(startDarkMode);
+        configureTooltips();
+
         SwingUtilities.invokeLater(() -> {
             Calendario calendar = new Calendario(startAlwaysOnTop, startupPosition, startDarkMode, startCompactMode);
             calendar.setVisible(true);
