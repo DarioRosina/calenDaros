@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.0.5] - 2026-06-22
+
+### Aggiunto
+- All'inserimento di un nuovo appuntamento, apertura automatica del menu Orari con selezione dell'orario opportuno in funzione dell'ora corrente.
+- Scorciatoie da tastiera nella form appuntamento: `Tab` dalla descrizione apre il menu Tipo, `Tab` dal Tipo passa al pulsante Salva e `Invio` sul pulsante Salva registra l'appuntamento.
+
+### Modificato
+- La conferma di eliminazione appuntamento ora mostra giorno e ora dell'appuntamento che verrà eliminato.
+
+## [1.0.4] - 2026-06-20
+
+### Modificato
+- Scurito lo sfondo dei pulsanti in modalità scura per renderlo coerente con il resto dell'interfaccia.
+- Aggiornato `compila_e_avvia.bat` per generare un `CalenDaros.jar` autosufficiente, includendo FlatLaf, FlatLaf Extras e JSVG nel JAR.
+
+### Corretto
+- Risolto il tema scuro che tornava parzialmente chiaro quando `CalenDaros.jar` veniva avviato o spostato senza la cartella `lib`.
+
 ## [1.0.3] - 2026-06-19
 
 ### Aggiunto

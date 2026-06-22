@@ -24,6 +24,7 @@ import java.text.MessageFormat;
 import java.text.Normalizer;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -215,11 +216,11 @@ public class Calendario extends JFrame {
     }
 
     private Color getControlBackground() {
-        return darkMode ? new Color(48, 53, 64) : NAVIGATION_BUTTON_COLOR_BG;
+        return darkMode ? new Color(35, 39, 49) : NAVIGATION_BUTTON_COLOR_BG;
     }
 
     private Color getControlHoverBackground() {
-        return darkMode ? new Color(62, 68, 82) : NAVIGATION_BUTTON_COLOR_BG.darker();
+        return darkMode ? new Color(47, 52, 64) : NAVIGATION_BUTTON_COLOR_BG.darker();
     }
 
     private Color getControlForeground() {
@@ -228,6 +229,10 @@ public class Calendario extends JFrame {
 
     private Color getBorderColor() {
         return darkMode ? new Color(74, 81, 97) : NAVIGATION_BUTTON_COLOR_BD;
+    }
+
+    private Color getFocusBorderColor() {
+        return darkMode ? new Color(125, 211, 252) : new Color(37, 99, 235);
     }
 
     private Color getHeaderBackground() {
@@ -283,7 +288,7 @@ public class Calendario extends JFrame {
     }
 
     public Calendario(boolean alwaysOnTopMode) {
-        this(alwaysOnTopMode, StartupPosition.CENTER, false, true);
+        this(alwaysOnTopMode, StartupPosition.TOP_LEFT, false, true);
     }
 
     public Calendario(boolean alwaysOnTopMode, StartupPosition startupPosition) {
@@ -380,10 +385,7 @@ public class Calendario extends JFrame {
         button.setBackground(bgColor);
         button.setForeground(getControlForeground());
         button.setFont(new Font("Arial", Font.BOLD, 12));
-        button.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(getBorderColor(), 1, true),
-            BorderFactory.createEmptyBorder(4, 10, 4, 10)
-        ));
+        configureButtonFocusStyle(button, 10);
         
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
         
@@ -877,9 +879,22 @@ public class Calendario extends JFrame {
 
     private void showNewAppointmentForm(int day) {
         detailsContentPanel.removeAll();
-        detailsContentPanel.add(createAppointmentForm(day, "09:00", "", "", Calendar_i18n.getString("appointment.other"), true), BorderLayout.CENTER);
+        detailsContentPanel.add(createNewAppointmentForm(day), BorderLayout.CENTER);
         detailsContentPanel.revalidate();
         detailsContentPanel.repaint();
+    }
+
+    private JPanel createNewAppointmentForm(int day) {
+        return createAppointmentForm(
+            day,
+            getCurrentQuarterHourTime(),
+            "",
+            "",
+            Calendar_i18n.getString("appointment.other"),
+            true,
+            null,
+            true
+        );
     }
 
     private JPanel createAppointmentForm(int day, String time, String title, String description, String type, boolean editable) {
@@ -888,6 +903,11 @@ public class Calendario extends JFrame {
 
     private JPanel createAppointmentForm(int day, String time, String title, String description, String type,
             boolean editable, CalendarAppointment appointment) {
+        return createAppointmentForm(day, time, title, description, type, editable, appointment, false);
+    }
+
+    private JPanel createAppointmentForm(int day, String time, String title, String description, String type,
+            boolean editable, CalendarAppointment appointment, boolean openTimeCombo) {
         JPanel formPanel = new JPanel(new GridBagLayout());
         formPanel.setBorder(BorderFactory.createLineBorder(Color.LIGHT_GRAY));
         GridBagConstraints gbc = new GridBagConstraints();
@@ -912,8 +932,11 @@ public class Calendario extends JFrame {
         titleField.setEditable(editable);
         descriptionArea.setEditable(editable);
         typeCombo.setEnabled(editable);
+        if (editable) {
+            bindDescriptionTabToTypeCombo(descriptionArea, typeCombo);
+        }
 
-        addFormRow(formPanel, gbc, 0, Calendar_i18n.getString("form.time"), createTimeInputPanel(timeField, editable));
+        addFormRow(formPanel, gbc, 0, Calendar_i18n.getString("form.time"), createTimeInputPanel(timeField, editable, openTimeCombo, titleField));
         addFormRow(formPanel, gbc, 1, Calendar_i18n.getString("form.title"), titleField);
 
         gbc.gridx = 0;
@@ -933,6 +956,8 @@ public class Calendario extends JFrame {
             JButton saveButton = createIconButton(createSaveIcon(), Calendar_i18n.getString("button.save"));
             cancelButton.setAlignmentX(Component.CENTER_ALIGNMENT);
             saveButton.setAlignmentX(Component.CENTER_ALIGNMENT);
+            bindTypeComboToSaveButton(typeCombo, saveButton);
+            bindSaveButtonEnter(saveButton);
             buttonPanel.add(saveButton);
             buttonPanel.add(Box.createVerticalStrut(6));
             buttonPanel.add(cancelButton);
@@ -967,7 +992,9 @@ public class Calendario extends JFrame {
                     saveNewAppointment(day, timeField, titleField, descriptionArea, typeCombo);
                 }
             });
-            SwingUtilities.invokeLater(() -> titleField.requestFocusInWindow());
+            if (!openTimeCombo) {
+                SwingUtilities.invokeLater(() -> titleField.requestFocusInWindow());
+            }
         } else if (appointment != null) {
             JPanel actionPanel = new JPanel();
             actionPanel.setLayout(new BoxLayout(actionPanel, BoxLayout.Y_AXIS));
@@ -1004,6 +1031,76 @@ public class Calendario extends JFrame {
         return formPanel;
     }
 
+    private void bindDescriptionTabToTypeCombo(JTextArea descriptionArea, JComboBox<String> typeCombo) {
+        descriptionArea.setFocusTraversalKeysEnabled(false);
+        InputMap inputMap = descriptionArea.getInputMap(JComponent.WHEN_FOCUSED);
+        ActionMap actionMap = descriptionArea.getActionMap();
+        String actionKey = "openTypeCombo";
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0), actionKey);
+        actionMap.put(actionKey, new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                typeCombo.putClientProperty("openedFromDescriptionTab", Boolean.TRUE);
+                Timer clearOpeningGuard = new Timer(600, event ->
+                    typeCombo.putClientProperty("openedFromDescriptionTab", Boolean.FALSE));
+                clearOpeningGuard.setRepeats(false);
+                clearOpeningGuard.start();
+                typeCombo.requestFocusInWindow();
+                openComboPopupAfterFocus(typeCombo);
+            }
+        });
+    }
+
+    private void openComboPopupAfterFocus(JComboBox<String> comboBox) {
+        Timer timer = new Timer(250, e -> {
+            comboBox.requestFocusInWindow();
+            comboBox.showPopup();
+        });
+        timer.setRepeats(false);
+        timer.start();
+    }
+
+    private void bindTypeComboToSaveButton(JComboBox<String> typeCombo, JButton saveButton) {
+        typeCombo.setFocusTraversalKeysEnabled(false);
+        typeCombo.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyReleased(KeyEvent e) {
+                if (e.getKeyCode() == KeyEvent.VK_TAB) {
+                    typeCombo.putClientProperty("openedFromDescriptionTab", Boolean.FALSE);
+                }
+            }
+        });
+        InputMap inputMap = typeCombo.getInputMap(JComponent.WHEN_FOCUSED);
+        ActionMap actionMap = typeCombo.getActionMap();
+        String actionKey = "focusSaveButton";
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_TAB, 0), actionKey);
+        actionMap.put(actionKey, new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (Boolean.TRUE.equals(typeCombo.getClientProperty("openedFromDescriptionTab"))) {
+                    return;
+                }
+                if (typeCombo.isPopupVisible()) {
+                    typeCombo.setPopupVisible(false);
+                }
+                saveButton.requestFocusInWindow();
+            }
+        });
+    }
+
+    private void bindSaveButtonEnter(JButton saveButton) {
+        InputMap inputMap = saveButton.getInputMap(JComponent.WHEN_FOCUSED);
+        ActionMap actionMap = saveButton.getActionMap();
+        String actionKey = "pressSaveButton";
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), actionKey);
+        actionMap.put(actionKey, new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                saveButton.doClick();
+            }
+        });
+    }
+
     private JPanel createDayMonthPanel(int day) {
         JPanel datePanel = new JPanel();
         datePanel.setLayout(new BoxLayout(datePanel, BoxLayout.Y_AXIS));
@@ -1037,6 +1134,14 @@ public class Calendario extends JFrame {
     }
 
     private JPanel createTimeInputPanel(JTextField timeField, boolean editable) {
+        return createTimeInputPanel(timeField, editable, false);
+    }
+
+    private JPanel createTimeInputPanel(JTextField timeField, boolean editable, boolean openTimeCombo) {
+        return createTimeInputPanel(timeField, editable, openTimeCombo, null);
+    }
+
+    private JPanel createTimeInputPanel(JTextField timeField, boolean editable, boolean openTimeCombo, JTextField focusAfterSelection) {
         JPanel timePanel = new JPanel(new BorderLayout(6, 0));
         JComboBox<String> timeCombo = new JComboBox<>(createQuarterHourOptions());
         timeCombo.setSelectedItem(normalizeTimeSelection(timeField.getText()));
@@ -1045,11 +1150,22 @@ public class Calendario extends JFrame {
             Object selectedTime = timeCombo.getSelectedItem();
             if (selectedTime != null) {
                 timeField.setText(selectedTime.toString());
+                if (focusAfterSelection != null) {
+                    SwingUtilities.invokeLater(() -> focusAfterSelection.requestFocusInWindow());
+                }
             }
         });
 
         timePanel.add(timeField, BorderLayout.CENTER);
         timePanel.add(timeCombo, BorderLayout.EAST);
+
+        if (editable && openTimeCombo) {
+            SwingUtilities.invokeLater(() -> {
+                timeCombo.requestFocusInWindow();
+                timeCombo.showPopup();
+            });
+        }
+
         return timePanel;
     }
 
@@ -1083,6 +1199,14 @@ public class Calendario extends JFrame {
         }
     }
 
+    private String getCurrentQuarterHourTime() {
+        LocalTime now = LocalTime.now();
+        int totalMinutes = now.getHour() * 60 + now.getMinute();
+        int roundedMinutes = ((totalMinutes + 14) / 15) * 15;
+        int normalizedMinutes = roundedMinutes % (24 * 60);
+        return String.format("%02d:%02d", normalizedMinutes / 60, normalizedMinutes % 60);
+    }
+
     private JButton createIconButton(Icon icon, String tooltip) {
         JButton button = new JButton(icon);
         button.setToolTipText(tooltip);
@@ -1091,13 +1215,42 @@ public class Calendario extends JFrame {
         button.setMaximumSize(new Dimension(32, 28));
         button.setBackground(getControlBackground());
         button.setForeground(getControlForeground());
-        button.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(getBorderColor(), 1, true),
-            BorderFactory.createEmptyBorder(4, 6, 4, 6)
-        ));
-        button.setFocusable(false);
+        button.setFocusPainted(false);
+        configureButtonFocusStyle(button, 6);
         button.setCursor(new Cursor(Cursor.HAND_CURSOR));
         return button;
+    }
+
+    private void configureButtonFocusStyle(JButton button, int horizontalPadding) {
+        button.putClientProperty("horizontalPadding", horizontalPadding);
+        updateButtonFocusBorder(button);
+        button.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                updateButtonFocusBorder(button);
+            }
+
+            @Override
+            public void focusLost(FocusEvent e) {
+                updateButtonFocusBorder(button);
+            }
+        });
+    }
+
+    private void updateButtonFocusBorder(JButton button) {
+        int horizontalPadding = 10;
+        Object padding = button.getClientProperty("horizontalPadding");
+        if (padding instanceof Integer) {
+            horizontalPadding = (Integer) padding;
+        }
+        Color borderColor = button.hasFocus() ? getFocusBorderColor() : getBorderColor();
+        int borderWidth = button.hasFocus() ? 2 : 1;
+        int verticalPadding = button.hasFocus() ? 3 : 4;
+        int adjustedHorizontalPadding = Math.max(0, horizontalPadding - (borderWidth - 1));
+        button.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(borderColor, borderWidth, true),
+            BorderFactory.createEmptyBorder(verticalPadding, adjustedHorizontalPadding, verticalPadding, adjustedHorizontalPadding)
+        ));
     }
 
     private Icon createMaterialIcon(String name, Color color, Icon fallback) {
@@ -1676,8 +1829,12 @@ public class Calendario extends JFrame {
     }
 
     private void deleteAppointment(CalendarAppointment appointment) {
+        String appointmentDate = appointment.day + " "
+            + Month.fromCalendarMonth(appointment.month).getDisplayName() + " "
+            + appointment.year;
         int choice = JOptionPane.showConfirmDialog(this,
-            Calendar_i18n.getString("confirm.delete_appointment"),
+            MessageFormat.format(Calendar_i18n.getString("confirm.delete_appointment"),
+                appointmentDate, appointment.time),
             Calendar_i18n.getString("button.delete"),
             JOptionPane.YES_NO_OPTION,
             JOptionPane.WARNING_MESSAGE);
@@ -2585,7 +2742,7 @@ public class Calendario extends JFrame {
     }
 
     private JLabel createVersionLink() {
-        JLabel versionLink = new JLabel("<html><u>CalenDaros v1.0.3</u></html>");
+        JLabel versionLink = new JLabel("<html><u>CalenDaros v1.0.5</u></html>");
         versionLink.putClientProperty("versionLink", Boolean.TRUE);
         versionLink.setFont(new Font("Arial", Font.BOLD, 11));
         versionLink.setForeground(getLinkColor());
@@ -2782,10 +2939,7 @@ public class Calendario extends JFrame {
 
         button.setBackground(getControlBackground());
         button.setForeground(getControlForeground());
-        button.setBorder(BorderFactory.createCompoundBorder(
-            BorderFactory.createLineBorder(getBorderColor(), 1, true),
-            BorderFactory.createEmptyBorder(4, 10, 4, 10)
-        ));
+        updateButtonFocusBorder(button);
     }
 
     private void applyThemeToComponent(Component component) {
@@ -2821,6 +2975,7 @@ public class Calendario extends JFrame {
         if (component instanceof JButton) {
             component.setBackground(getControlBackground());
             component.setForeground(getControlForeground());
+            updateButtonFocusBorder((JButton) component);
         }
 
         if (component instanceof Container) {
@@ -3072,7 +3227,7 @@ public class Calendario extends JFrame {
                 return position;
             }
         }
-        return StartupPosition.CENTER;
+        return StartupPosition.TOP_LEFT;
     }
 
     private static StartupPosition parseStartupPositionShortcut(String arg) {

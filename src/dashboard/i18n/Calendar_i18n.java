@@ -125,7 +125,7 @@ public class Calendar_i18n {
         italianResources.put("dialog.export_title", "Esporta calendario");
         italianResources.put("dialog.export_success", "Esportazione completata: {0} eventi esportati.");
         italianResources.put("dialog.export_empty", "Non ci sono eventi da esportare.");
-        italianResources.put("confirm.delete_appointment", "Eliminare questo appuntamento?");
+        italianResources.put("confirm.delete_appointment", "Eliminare l''appuntamento del {0} alle {1}?");
         italianResources.put("confirm.overwrite_file", "Il file esiste già. Vuoi sovrascriverlo?");
         italianResources.put("error.icon_load", "Impossibile caricare l''icona: {0}");
         italianResources.put("error.appointments_load", "Impossibile caricare gli appuntamenti salvati: {0}");
@@ -210,7 +210,7 @@ public class Calendar_i18n {
         englishResources.put("dialog.export_title", "Export calendar");
         englishResources.put("dialog.export_success", "Export completed: {0} events exported.");
         englishResources.put("dialog.export_empty", "There are no events to export.");
-        englishResources.put("confirm.delete_appointment", "Delete this appointment?");
+        englishResources.put("confirm.delete_appointment", "Delete the appointment on {0} at {1}?");
         englishResources.put("confirm.overwrite_file", "The file already exists. Do you want to overwrite it?");
         englishResources.put("error.icon_load", "Unable to load icon: {0}");
         englishResources.put("error.appointments_load", "Unable to load saved appointments: {0}");

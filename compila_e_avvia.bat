@@ -10,6 +10,7 @@ set "FLATLAF_EXTRAS_JAR=%LIB_DIR%\flatlaf-extras.jar"
 set "JSVG_JAR=%LIB_DIR%\jsvg.jar"
 set "JAR_FILE=%SCRIPT_DIR%CalenDaros.jar"
 set "SOURCES_FILE=%BIN_DIR%\sources.txt"
+set "MANIFEST_FILE=%BIN_DIR%\MANIFEST.MF"
 
 cd /d "%SRC_DIR%"
 
@@ -84,13 +85,28 @@ if exist "%SRC_DIR%\img" xcopy /E /I /Y "%SRC_DIR%\img" "%BIN_DIR%\dashboard\img
 if exist "%SRC_DIR%\i18n" xcopy /E /I /Y "%SRC_DIR%\i18n" "%BIN_DIR%\dashboard\i18n" >nul
 if exist "%SOURCES_FILE%" del /q "%SOURCES_FILE%"
 
+echo [INFO] Inclusione librerie nel JAR...
+pushd "%BIN_DIR%"
+if exist "%FLATLAF_JAR%" jar xf "%FLATLAF_JAR%"
+if exist "%FLATLAF_EXTRAS_JAR%" jar xf "%FLATLAF_EXTRAS_JAR%"
+if exist "%JSVG_JAR%" jar xf "%JSVG_JAR%"
+if exist META-INF rmdir /s /q META-INF
+popd
+
 echo [INFO] Creazione JAR eseguibile...
-jar cfe "%JAR_FILE%" dashboard.Calendario -C "%BIN_DIR%" .
+(
+    echo Manifest-Version: 1.0
+    echo Main-Class: dashboard.Calendario
+    echo.
+) > "%MANIFEST_FILE%"
+
+jar cfm "%JAR_FILE%" "%MANIFEST_FILE%" -C "%BIN_DIR%" .
 if errorlevel 1 (
     echo [ERRORE] Creazione JAR non riuscita.
     pause
     exit /b 1
 )
+if exist "%MANIFEST_FILE%" del /q "%MANIFEST_FILE%"
 
 echo [INFO] Avvio dell'applicazione...
 if exist "%FLATLAF_JAR%" (
