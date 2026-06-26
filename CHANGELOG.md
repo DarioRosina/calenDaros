@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.0.6] - 2026-06-26
+
+### Aggiunto
+- Pulsante rapido per aprire Google Calendar dal pannello controlli, con icona moderna dedicata.
+- Doppio click su un appuntamento nel calendario esteso per aprire direttamente la modalità di modifica.
+
+### Modificato
+- Quando si apre la modalità estesa sul mese corrente, la scrollbar porta automaticamente in vista il giorno corrente.
+
 ## [1.0.5] - 2026-06-22
 
 ### Aggiunto

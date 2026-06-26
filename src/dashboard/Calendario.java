@@ -71,6 +71,8 @@ public class Calendario extends JFrame {
     private JPanel dayOfWeekHeaderPanel;
     private JPanel appointmentGridPanel;
     private JPanel detailsContentPanel;
+    private JScrollPane appointmentScrollPane;
+    private JPanel todayDayPanel;
     
     /**
      * Text area that displays details about the selected appointment.
@@ -107,6 +109,8 @@ public class Calendario extends JFrame {
     private static final Color ICON_DANGER_COLOR = new Color(220, 38, 38);
     private static final Color ICON_PIN_ON_COLOR = new Color(22, 163, 74);
     private static final Color ICON_PIN_OFF_COLOR = new Color(220, 38, 38);
+    private static final String GOOGLE_CALENDAR_URL = "https://calendar.google.com/calendar";
+    private static final String VERSION_PAGE_URL = "https://www.darioros.it/posts/calenDaros";
     private static final Path APPOINTMENTS_FILE = Paths.get(
         System.getProperty("user.home"), ".calenDaros", "appointments.properties");
     private static final Path UI_SETTINGS_FILE = Paths.get(
@@ -487,6 +491,7 @@ public class Calendario extends JFrame {
             // Update displays
             miniCalendarPanel.updateDisplay();
             updateAppointmentPanel();
+            scrollTodayIntoViewIfCurrentMonth();
         });
 
         // Add component size logger
@@ -531,6 +536,9 @@ public class Calendario extends JFrame {
         // Reset to desired size after packing
         setSize(compactMode ? new Dimension(getCompactWindowWidth(), 400) : extendedWindowSize);
         applyStartupPosition();
+        if (!compactMode) {
+            scrollTodayIntoViewIfCurrentMonth();
+        }
     }
 
     private void applyStartupPosition() {
@@ -584,6 +592,7 @@ public class Calendario extends JFrame {
     
     private void updateAppointmentPanel() {
         appointmentGridPanel.removeAll();
+        todayDayPanel = null;
         updateDayOfWeekHeaderPanel();
         
         Calendar firstVisibleDay = (Calendar) calendar.clone();
@@ -623,6 +632,9 @@ public class Calendario extends JFrame {
             boolean isToday = currentYear == today.get(Calendar.YEAR) &&
                             currentMonth == today.get(Calendar.MONTH) &&
                             currentDay == today.get(Calendar.DAY_OF_MONTH);
+            if (isToday && isCurrentMonth) {
+                todayDayPanel = dayPanel;
+            }
             
             if (isSelectedDay) {
                 Debug.logCalendarSelection("Found selected day in appointment panel", calendar);
@@ -699,6 +711,7 @@ public class Calendario extends JFrame {
             Appuntamenti.addAppointment(dayPanel, appointment.time, appointment.title, appointment.description,
                 getAppointmentColor(appointment.type), calendar, appointmentDetails,
                 (time, title, description, selectedDay) -> showAppointmentDetails(appointment),
+                () -> showAppointmentEditor(appointment),
                 (targetDate, duplicate) -> {
                     if (duplicate) {
                         duplicateAppointmentToDate(appointment, targetDate[0], targetDate[1], targetDate[2]);
@@ -1146,11 +1159,12 @@ public class Calendario extends JFrame {
         JComboBox<String> timeCombo = new JComboBox<>(createQuarterHourOptions());
         timeCombo.setSelectedItem(normalizeTimeSelection(timeField.getText()));
         timeCombo.setEnabled(editable);
+        bindTimeComboKeyboardNavigation(timeCombo);
         timeCombo.addActionListener(e -> {
             Object selectedTime = timeCombo.getSelectedItem();
             if (selectedTime != null) {
                 timeField.setText(selectedTime.toString());
-                if (focusAfterSelection != null) {
+                if (focusAfterSelection != null && !isTimeComboKeyboardNavigation(timeCombo)) {
                     SwingUtilities.invokeLater(() -> focusAfterSelection.requestFocusInWindow());
                 }
             }
@@ -1167,6 +1181,33 @@ public class Calendario extends JFrame {
         }
 
         return timePanel;
+    }
+
+    private void bindTimeComboKeyboardNavigation(JComboBox<String> timeCombo) {
+        timeCombo.addKeyListener(new KeyAdapter() {
+            @Override
+            public void keyPressed(KeyEvent e) {
+                if (timeCombo.isPopupVisible() && isVerticalArrowKey(e)) {
+                    timeCombo.putClientProperty("timeComboKeyboardNavigation", Boolean.TRUE);
+                }
+            }
+
+            @Override
+            public void keyReleased(KeyEvent e) {
+                if (isVerticalArrowKey(e)) {
+                    SwingUtilities.invokeLater(() ->
+                        timeCombo.putClientProperty("timeComboKeyboardNavigation", Boolean.FALSE));
+                }
+            }
+        });
+    }
+
+    private boolean isTimeComboKeyboardNavigation(JComboBox<String> timeCombo) {
+        return Boolean.TRUE.equals(timeCombo.getClientProperty("timeComboKeyboardNavigation"));
+    }
+
+    private boolean isVerticalArrowKey(KeyEvent e) {
+        return e.getKeyCode() == KeyEvent.VK_UP || e.getKeyCode() == KeyEvent.VK_DOWN;
     }
 
     private String[] createQuarterHourOptions() {
@@ -1263,6 +1304,17 @@ public class Calendario extends JFrame {
             Constructor<?> constructor = svgIconClass.getConstructor(String.class, int.class, int.class);
             Object icon = constructor.newInstance("dashboard/img/material/" + name + ".svg", size, size);
             applyMaterialIconColor(svgIconClass, icon, color);
+            return icon instanceof Icon ? (Icon) icon : fallback;
+        } catch (ReflectiveOperationException | LinkageError e) {
+            return fallback;
+        }
+    }
+
+    private Icon createSvgIcon(String resourcePath, int size, Icon fallback) {
+        try {
+            Class<?> svgIconClass = Class.forName("com.formdev.flatlaf.extras.FlatSVGIcon");
+            Constructor<?> constructor = svgIconClass.getConstructor(String.class, int.class, int.class);
+            Object icon = constructor.newInstance(resourcePath, size, size);
             return icon instanceof Icon ? (Icon) icon : fallback;
         } catch (ReflectiveOperationException | LinkageError e) {
             return fallback;
@@ -1654,6 +1706,38 @@ public class Calendario extends JFrame {
             }
         };
         return createMaterialIcon("file_upload", color, fallback);
+    }
+
+    private Icon createExternalCalendarIcon() {
+        Color color = getControlForeground();
+        Icon fallback = new Icon() {
+            @Override
+            public int getIconWidth() {
+                return 16;
+            }
+
+            @Override
+            public int getIconHeight() {
+                return 16;
+            }
+
+            @Override
+            public void paintIcon(Component c, Graphics g, int x, int y) {
+                Graphics2D g2 = (Graphics2D) g.create();
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(color);
+                g2.setStroke(new BasicStroke(1.6f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
+                g2.drawRoundRect(x + 2, y + 5, 10, 9, 2, 2);
+                g2.drawLine(x + 2, y + 8, x + 12, y + 8);
+                g2.drawLine(x + 5, y + 3, x + 5, y + 6);
+                g2.drawLine(x + 9, y + 3, x + 9, y + 6);
+                g2.drawLine(x + 9, y + 2, x + 14, y + 2);
+                g2.drawLine(x + 14, y + 2, x + 14, y + 7);
+                g2.drawLine(x + 10, y + 6, x + 14, y + 2);
+                g2.dispose();
+            }
+        };
+        return createSvgIcon("dashboard/img/google_calendar_icon.svg", MATERIAL_ICON_SIZE, fallback);
     }
 
     private Icon createThemeIcon(boolean dark) {
@@ -2423,6 +2507,38 @@ public class Calendario extends JFrame {
         miniCalendarPanel.updateDisplay();
         revalidate();
         repaint();
+        if (!compactMode) {
+            scrollTodayIntoViewIfCurrentMonth();
+        }
+    }
+
+    private void scrollTodayIntoViewIfCurrentMonth() {
+        if (compactMode || appointmentScrollPane == null || todayDayPanel == null || !isViewingCurrentMonth()) {
+            return;
+        }
+
+        SwingUtilities.invokeLater(() -> {
+            if (appointmentScrollPane == null || todayDayPanel == null || !todayDayPanel.isShowing()) {
+                return;
+            }
+
+            Rectangle todayBounds = SwingUtilities.convertRectangle(
+                todayDayPanel.getParent(),
+                todayDayPanel.getBounds(),
+                appointmentPanel
+            );
+            JViewport viewport = appointmentScrollPane.getViewport();
+            int centeredY = todayBounds.y - Math.max(0, (viewport.getHeight() - todayBounds.height) / 2);
+            JScrollBar verticalBar = appointmentScrollPane.getVerticalScrollBar();
+            int maxValue = Math.max(verticalBar.getMinimum(), verticalBar.getMaximum() - verticalBar.getVisibleAmount());
+            verticalBar.setValue(Math.max(verticalBar.getMinimum(), Math.min(centeredY, maxValue)));
+        });
+    }
+
+    private boolean isViewingCurrentMonth() {
+        Calendar today = Calendar.getInstance();
+        return calendar.get(Calendar.YEAR) == today.get(Calendar.YEAR)
+            && calendar.get(Calendar.MONTH) == today.get(Calendar.MONTH);
     }
 
     private void rememberExtendedWindowSize() {
@@ -2655,7 +2771,7 @@ public class Calendario extends JFrame {
         buttonsPanel.add(toggleViewButton); // Add the toggle button
         buttonsPanel.add(alwaysOnTopButton);
 
-        JPanel importPanel = createToolbarButtonPanel(10);
+        JPanel importPanel = createToolbarButtonPanel(10, 4);
         markSidebarComponent(importPanel);
         importPanel.setBorder(BorderFactory.createEmptyBorder(0, 0, 10, 0));
         alignSidebarComponent(importPanel);
@@ -2669,6 +2785,11 @@ public class Calendario extends JFrame {
         exportButton.setToolTipText(Calendar_i18n.getString("button.export_tooltip"));
         exportButton.getAccessibleContext().setAccessibleName(Calendar_i18n.getString("button.export"));
         exportButton.addActionListener(e -> exportAppointmentsToIcs());
+        JButton googleCalendarButton = createStyledButton("", getControlBackground());
+        googleCalendarButton.setIcon(createExternalCalendarIcon());
+        googleCalendarButton.setToolTipText(Calendar_i18n.getString("button.google_calendar_tooltip"));
+        googleCalendarButton.getAccessibleContext().setAccessibleName(Calendar_i18n.getString("button.google_calendar"));
+        googleCalendarButton.addActionListener(e -> openExternalLink(GOOGLE_CALENDAR_URL));
         String themeButtonText = darkMode
             ? Calendar_i18n.getString("button.light_theme")
             : Calendar_i18n.getString("button.dark_theme");
@@ -2680,10 +2801,12 @@ public class Calendario extends JFrame {
 
         styleNavigationIconButton(importButton, prevButton.getPreferredSize());
         styleNavigationIconButton(exportButton, todayButton.getPreferredSize());
+        styleNavigationIconButton(googleCalendarButton, nextButton.getPreferredSize());
         styleNavigationIconButton(themeButton, nextButton.getPreferredSize());
 
         importPanel.add(importButton);
         importPanel.add(exportButton);
+        importPanel.add(googleCalendarButton);
         importPanel.add(themeButton);
 
         filterPanel.add(filterLabel, BorderLayout.NORTH);
@@ -2742,12 +2865,12 @@ public class Calendario extends JFrame {
     }
 
     private JLabel createVersionLink() {
-        JLabel versionLink = new JLabel("<html><u>CalenDaros v1.0.5</u></html>");
+        JLabel versionLink = new JLabel("<html><u>CalenDaros v1.0.6</u></html>");
         versionLink.putClientProperty("versionLink", Boolean.TRUE);
         versionLink.setFont(new Font("Arial", Font.BOLD, 11));
         versionLink.setForeground(getLinkColor());
         versionLink.setCursor(new Cursor(Cursor.HAND_CURSOR));
-        versionLink.setToolTipText("https://darioros.it/posts/calenDaros");
+        versionLink.setToolTipText(VERSION_PAGE_URL);
         versionLink.setAlignmentX(Component.LEFT_ALIGNMENT);
         versionLink.addMouseListener(new MouseAdapter() {
             @Override
@@ -2769,11 +2892,15 @@ public class Calendario extends JFrame {
     }
 
     private void openVersionPage() {
+        openExternalLink(VERSION_PAGE_URL);
+    }
+
+    private void openExternalLink(String url) {
         try {
             if (!Desktop.isDesktopSupported() || !Desktop.getDesktop().isSupported(Desktop.Action.BROWSE)) {
                 throw new UnsupportedOperationException("Desktop browse is not supported");
             }
-            Desktop.getDesktop().browse(URI.create("https://darioros.it/posts/calenDaros"));
+            Desktop.getDesktop().browse(URI.create(url));
         } catch (IOException | RuntimeException e) {
             JOptionPane.showMessageDialog(this,
                 MessageFormat.format(Calendar_i18n.getString("error.open_link"), e.getMessage()),
@@ -2826,8 +2953,12 @@ public class Calendario extends JFrame {
     }
 
     private JPanel createToolbarButtonPanel(int bottomGap) {
-        JPanel panel = new JPanel(new GridLayout(1, 3, 6, 0));
-        int width = (NAVIGATION_ICON_BUTTON_SIZE.width * 3) + 12;
+        return createToolbarButtonPanel(bottomGap, 3);
+    }
+
+    private JPanel createToolbarButtonPanel(int bottomGap, int buttonCount) {
+        JPanel panel = new JPanel(new GridLayout(1, buttonCount, 6, 0));
+        int width = (NAVIGATION_ICON_BUTTON_SIZE.width * buttonCount) + (6 * Math.max(0, buttonCount - 1));
         Dimension size = new Dimension(width, NAVIGATION_ICON_BUTTON_SIZE.height + bottomGap);
         panel.setPreferredSize(size);
         panel.setMinimumSize(size);
@@ -3002,15 +3133,15 @@ public class Calendario extends JFrame {
         appointmentPanel.add(appointmentGridPanel, BorderLayout.CENTER);
         
         // Create a scroll pane for the appointment panel
-        JScrollPane scrollPane = new JScrollPane(appointmentPanel);
-        scrollPane.setBorder(BorderFactory.createEmptyBorder());
-        scrollPane.setOpaque(false);
-        scrollPane.getViewport().setOpaque(false);
-        scrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
-        scrollPane.getVerticalScrollBar().setUnitIncrement(16);
+        appointmentScrollPane = new JScrollPane(appointmentPanel);
+        appointmentScrollPane.setBorder(BorderFactory.createEmptyBorder());
+        appointmentScrollPane.setOpaque(false);
+        appointmentScrollPane.getViewport().setOpaque(false);
+        appointmentScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        appointmentScrollPane.getVerticalScrollBar().setUnitIncrement(16);
         
         // Add the scroll pane to the main panel
-        mainPanel.add(scrollPane, BorderLayout.CENTER);
+        mainPanel.add(appointmentScrollPane, BorderLayout.CENTER);
         
         // Initial update of the appointment panel
         updateAppointmentPanel();

@@ -105,6 +105,15 @@ public class Appuntamenti {
                                     Calendar calendar, JTextArea appointmentDetails,
                                     AppointmentSelectionListener selectionListener,
                                     BiConsumer<int[], Boolean> dragListener) {
+        addAppointment(dayPanel, time, title, description, color, calendar, appointmentDetails,
+            selectionListener, null, dragListener);
+    }
+
+    public static void addAppointment(JPanel dayPanel, String time, String title, String description, Color color,
+                                    Calendar calendar, JTextArea appointmentDetails,
+                                    AppointmentSelectionListener selectionListener,
+                                    Runnable doubleClickListener,
+                                    BiConsumer<int[], Boolean> dragListener) {
         JPanel appointmentPanel = new JPanel();
         appointmentPanel.setLayout(new BoxLayout(appointmentPanel, BoxLayout.Y_AXIS));
         appointmentPanel.putClientProperty("appointmentComponent", Boolean.TRUE);
@@ -135,7 +144,8 @@ public class Appuntamenti {
         
         // Create a MouseListener for all appointment components
         MouseAdapter appointmentListener = createAppointmentMouseListener(
-            appointmentPanel, dayPanel, color, calendar, appointmentDetails, time, title, description, selectionListener, dragListener);
+            appointmentPanel, dayPanel, color, calendar, appointmentDetails, time, title, description,
+            selectionListener, doubleClickListener, dragListener);
         
         // Add the listener to the appointment panel
         appointmentPanel.addMouseListener(appointmentListener);
@@ -160,7 +170,8 @@ public class Appuntamenti {
     private static MouseAdapter createAppointmentMouseListener(
             JPanel appointmentPanel, JPanel dayPanel, Color color, 
             Calendar calendar, JTextArea appointmentDetails, String time, String title, String description,
-            AppointmentSelectionListener selectionListener, BiConsumer<int[], Boolean> dragListener) {
+            AppointmentSelectionListener selectionListener, Runnable doubleClickListener,
+            BiConsumer<int[], Boolean> dragListener) {
         
         return new MouseAdapter() {
             private Point dragStart;
@@ -241,6 +252,10 @@ public class Appuntamenti {
                         MessageFormat.format(Calendar_i18n.getString("details.time"), time) + "\n" +
                         MessageFormat.format(Calendar_i18n.getString("details.description"), description)
                     );
+                }
+
+                if (e.getClickCount() >= 2 && doubleClickListener != null) {
+                    doubleClickListener.run();
                 }
             }
 

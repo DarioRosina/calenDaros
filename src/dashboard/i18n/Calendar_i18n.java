@@ -65,6 +65,8 @@ public class Calendar_i18n {
         italianResources.put("button.import_tooltip", "Importa eventi da Google Calendar");
         italianResources.put("button.export", "Esporta");
         italianResources.put("button.export_tooltip", "Esporta eventi in formato .ics per Google Calendar");
+        italianResources.put("button.google_calendar", "Google Calendar");
+        italianResources.put("button.google_calendar_tooltip", "Apri Google Calendar");
         italianResources.put("button.dark_theme", "Tema scuro");
         italianResources.put("button.light_theme", "Tema chiaro");
         italianResources.put("button.theme_tooltip", "Passa dal tema chiaro al tema scuro");
@@ -150,6 +152,8 @@ public class Calendar_i18n {
         englishResources.put("button.import_tooltip", "Import events from Google Calendar");
         englishResources.put("button.export", "Export");
         englishResources.put("button.export_tooltip", "Export events as an .ics file for Google Calendar");
+        englishResources.put("button.google_calendar", "Google Calendar");
+        englishResources.put("button.google_calendar_tooltip", "Open Google Calendar");
         englishResources.put("button.dark_theme", "Dark theme");
         englishResources.put("button.light_theme", "Light theme");
         englishResources.put("button.theme_tooltip", "Switch between light and dark theme");
