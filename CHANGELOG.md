@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.0.7] - 2026-06-27
+
+### Modificato
+- Quando si apre la modalità estesa sul mese corrente, la scrollbar orizzontale si sposta automaticamente per rendere visibile il giorno corrente.
+
 ## [1.0.6] - 2026-06-26
 
 ### Aggiunto

@@ -2528,10 +2528,20 @@ public class Calendario extends JFrame {
                 appointmentPanel
             );
             JViewport viewport = appointmentScrollPane.getViewport();
+            int centeredX = todayBounds.x - Math.max(0, (viewport.getWidth() - todayBounds.width) / 2);
             int centeredY = todayBounds.y - Math.max(0, (viewport.getHeight() - todayBounds.height) / 2);
+            JScrollBar horizontalBar = appointmentScrollPane.getHorizontalScrollBar();
             JScrollBar verticalBar = appointmentScrollPane.getVerticalScrollBar();
-            int maxValue = Math.max(verticalBar.getMinimum(), verticalBar.getMaximum() - verticalBar.getVisibleAmount());
-            verticalBar.setValue(Math.max(verticalBar.getMinimum(), Math.min(centeredY, maxValue)));
+            int maxHorizontalValue = Math.max(
+                horizontalBar.getMinimum(),
+                horizontalBar.getMaximum() - horizontalBar.getVisibleAmount()
+            );
+            int maxVerticalValue = Math.max(
+                verticalBar.getMinimum(),
+                verticalBar.getMaximum() - verticalBar.getVisibleAmount()
+            );
+            horizontalBar.setValue(Math.max(horizontalBar.getMinimum(), Math.min(centeredX, maxHorizontalValue)));
+            verticalBar.setValue(Math.max(verticalBar.getMinimum(), Math.min(centeredY, maxVerticalValue)));
         });
     }
 
@@ -2865,7 +2875,7 @@ public class Calendario extends JFrame {
     }
 
     private JLabel createVersionLink() {
-        JLabel versionLink = new JLabel("<html><u>CalenDaros v1.0.6</u></html>");
+        JLabel versionLink = new JLabel("<html><u>CalenDaros v1.0.7</u></html>");
         versionLink.putClientProperty("versionLink", Boolean.TRUE);
         versionLink.setFont(new Font("Arial", Font.BOLD, 11));
         versionLink.setForeground(getLinkColor());
@@ -3138,6 +3148,7 @@ public class Calendario extends JFrame {
         appointmentScrollPane.setOpaque(false);
         appointmentScrollPane.getViewport().setOpaque(false);
         appointmentScrollPane.setVerticalScrollBarPolicy(JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED);
+        appointmentScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_AS_NEEDED);
         appointmentScrollPane.getVerticalScrollBar().setUnitIncrement(16);
         
         // Add the scroll pane to the main panel
